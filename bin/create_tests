@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+require 'optparse'
+require 'create_tests'
+
+options = {
+  mode: :append
+}
+
+optparse = OptionParser.new do |opts|
+  opts.banner = "Usage: create_tests [requests_file] [options]\n"
+  opts.banner+= "Generate tests from the requests file.\n"
+  opts.banner+= "More info: https://github.com/MarioRuiz/create_tests\n\n"
+  opts.banner+= "In case no options supplied: \n"
+  opts.banner+= "  * It will be adding the tests that are missing if the test file already exists\n"
+  
+  opts.on("-n", "--dont_overwrite", "In case the test file exists it won't change anything") do
+    options[:mode] = :dont_overwrite
+  end
+
+  opts.on("-w", "--overwrite", "In case the test file exists it will be ovewritten, so the previous content will deleted") do
+    options[:mode] = :overwrite
+  end
+
+  opts.on("-a", "--append", "In case the test file exists it will be ovewritten, so the previous content will deleted") do
+    options[:mode] = :append
+  end
+
+end
+
+optparse.parse!
+
+filename = ARGV.pop
+if filename.to_s==''
+  puts optparse
+  puts "** Need to specify at least a requests file."
+else
+  CreateTests.from filename, options
+end

@@ -1,0 +1,5 @@
+--readme README.md
+--title 'create_tests -- Create Tests automatically from a Requests file. Perfect to be used with the result from importing a Swagger file using the open_api_import gem'
+--charset utf-8
+--markup markdown
+'lib/*.rb' - '*.md' - 'LICENSE'
