@@ -91,7 +91,7 @@ create_tests ./requests/uber.yaml.rb
 - Helper: ./spec/helper.rb
 ```
 
-You can see a reproduction of what we did before on here: https://github.com/MarioRuiz/create_tests/example
+You can see a reproduction of what we did before on here: https://github.com/MarioRuiz/create_tests/tree/master/example
 
 ## Parameters
 
