@@ -321,14 +321,17 @@ class CreateTests
             "
       end
 
-      tests["it 'doesn\\'t retrieve data if not authenticated'"] = "do
+      title = "it 'doesn\\'t retrieve data if not authenticated'"
+      tests[title] = "do
             @http.headers = {}
             resp = @http.#{request[:method]}(@request)
-            expect(resp.code).to be_between('400', '499')
-            expect(NiceHash.compare_structure(@request.responses[resp.code.to_sym].data, resp.data.json)).to eq true
-            expect(resp.message).to eq @request.responses[resp.code.to_sym].message
-          end
-        "
+            expect(resp.code).to be_between('400', '499')\n"
+      if request.key?(:responses) and (request[:responses].keys.select{|c| c.to_s.to_i>=400&&c.to_s.to_i<=499}).size>0
+      tests[title] += "expect(NiceHash.compare_structure(@request.responses[resp.code.to_sym].data, resp.data.json)).to eq true
+        expect(resp.message).to eq @request.responses[resp.code.to_sym].message\n"
+      end
+      tests[title] += "end\n"
+            
       if params.size > 0
         missing_param = ""
         params.each do |p|
@@ -336,9 +339,10 @@ class CreateTests
           missing_param += "
                     request = #{r}
                     resp = @http.#{request[:method]}(request)
-                    expect(resp.code).to be_between('400', '499')
-                    expect(resp.message).to match /\#{request.responses[resp.code.to_sym].message}/i
-                    "
+                    expect(resp.code).to be_between('400', '499')\n"
+                    if request.key?(:responses) and (request[:responses].keys.select{|c| c.to_s.to_i>=400&&c.to_s.to_i<=499}).size>0
+                      missing_param += "expect(resp.message).to match /\#{request.responses[resp.code.to_sym].message}/i\n"
+                    end
         end
         missing_param += "end\n"
         tests["it 'returns error if required parameter missing' "] = "do\n#{missing_param}"

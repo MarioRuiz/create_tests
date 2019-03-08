@@ -17,7 +17,5 @@ RSpec.describe User, "#profile_user" do
     @http.headers = {}
     resp = @http.get(@request)
     expect(resp.code).to be_between("400", "499")
-    expect(NiceHash.compare_structure(@request.responses[resp.code.to_sym].data, resp.data.json)).to eq true
-    expect(resp.message).to eq @request.responses[resp.code.to_sym].message
   end
 end

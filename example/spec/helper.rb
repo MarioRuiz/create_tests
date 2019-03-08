@@ -6,16 +6,6 @@ require "../settings/general" unless defined?(ROOT_DIR)
 #   Helper.the_method_i_call(@http)
 #   Helper.the_method_i_call()
 module Helper
-  def self.latitude(http = NiceHttp.new())
-    http.logger.info "Helper.#{__method__}"
-
-    return ""
-  end
-  def self.longitude(http = NiceHttp.new())
-    http.logger.info "Helper.#{__method__}"
-
-    return ""
-  end
   def self.start_latitude(http = NiceHttp.new())
     http.logger.info "Helper.#{__method__}"
 
@@ -32,6 +22,16 @@ module Helper
     return ""
   end
   def self.end_longitude(http = NiceHttp.new())
+    http.logger.info "Helper.#{__method__}"
+
+    return ""
+  end
+  def self.latitude(http = NiceHttp.new())
+    http.logger.info "Helper.#{__method__}"
+
+    return ""
+  end
+  def self.longitude(http = NiceHttp.new())
     http.logger.info "Helper.#{__method__}"
 
     return ""

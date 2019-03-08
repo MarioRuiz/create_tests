@@ -21,28 +21,22 @@ RSpec.describe Estimates, "#price_estimates" do
     @http.headers = {}
     resp = @http.get(@request)
     expect(resp.code).to be_between("400", "499")
-    expect(NiceHash.compare_structure(@request.responses[resp.code.to_sym].data, resp.data.json)).to eq true
-    expect(resp.message).to eq @request.responses[resp.code.to_sym].message
   end
   it "returns error if required parameter missing" do
     request = Estimates.price_estimates("", @start_longitude, @end_latitude, @end_longitude)
     resp = @http.get(request)
     expect(resp.code).to be_between("400", "499")
-    expect(resp.message).to match /#{request.responses[resp.code.to_sym].message}/i
 
     request = Estimates.price_estimates(@start_latitude, "", @end_latitude, @end_longitude)
     resp = @http.get(request)
     expect(resp.code).to be_between("400", "499")
-    expect(resp.message).to match /#{request.responses[resp.code.to_sym].message}/i
 
     request = Estimates.price_estimates(@start_latitude, @start_longitude, "", @end_longitude)
     resp = @http.get(request)
     expect(resp.code).to be_between("400", "499")
-    expect(resp.message).to match /#{request.responses[resp.code.to_sym].message}/i
 
     request = Estimates.price_estimates(@start_latitude, @start_longitude, @end_latitude, "")
     resp = @http.get(request)
     expect(resp.code).to be_between("400", "499")
-    expect(resp.message).to match /#{request.responses[resp.code.to_sym].message}/i
   end
 end
