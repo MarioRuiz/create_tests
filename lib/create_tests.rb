@@ -313,12 +313,15 @@ class CreateTests
       # first response on responses is the one expected to be returned when success
       if request.key?(:responses) and request[:responses].size > 0
         code = request[:responses].keys[0]
-        tests["it 'has correct structure in succesful response' "] = "do
+        title="it 'has correct structure in succesful response' "
+        tests[title] = "do
                 resp = @http.#{request[:method]}(@request)
-                expect(resp.code).to eq #{code}
-                expect(NiceHash.compare_structure(@request.responses._#{code}.data, resp.data.json, true)).to be true
-              end
-            "
+                expect(resp.code).to eq #{code}\n"
+
+        if request[:responses][code].is_a?(Hash) and request[:responses][code].key?(:data)
+          tests[title] +="expect(NiceHash.compare_structure(@request.responses._#{code}.data, resp.data.json, true)).to be true\n"
+        end
+        tests[title] += "end\n"
       end
 
       title = "it 'doesn\\'t retrieve data if not authenticated'"
