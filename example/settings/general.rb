@@ -18,7 +18,7 @@ NiceHttp.headers = {
 }
 
 # Requests
-require_relative "../requests/uber.yaml.rb"
+require_relative "../requests/uber.yaml"
 
 require_relative "../spec/helper.rb"
 include Swagger::UberApi::V1_0_0

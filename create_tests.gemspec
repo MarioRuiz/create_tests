@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'create_tests'
-  s.version     = '0.2.0'
+  s.version     = '0.3.0'
   s.summary     = "CreateTests -- Create Tests automatically from a Requests file. Perfect to be used with the result from importing a Swagger file using the open_api_import gem"
   s.description = "CreateTests -- Create Tests automatically from a Requests file. Perfect to be used with the result from importing a Swagger file using the open_api_import gem"
   s.authors     = ["Mario Ruiz"]
