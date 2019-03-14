@@ -221,6 +221,7 @@ class CreateTests
         # fex: HOST=myhosttotest
         ENV['HOST'] ||= 'defaulthost'
         NiceHttp.host = ENV['HOST']
+        NiceHttp.log = :file_run
         # Add here the headers for authentication for example
         NiceHttp.headers = {
             Auhentication: 'Token'
@@ -297,8 +298,7 @@ class CreateTests
 
         RSpec.describe #{mod_name}, '##{method_txt}' do
         before(:all) do
-          # create connection on default host and store the logs on the_name_of_file.rb.log
-          @http = NiceHttp.new({log: \"\#{__FILE__}.log\"})
+          @http = NiceHttp.new()
           #{params_declaration_txt}@request = #{req_txt}
         end
         before(:each) do |example|
@@ -329,7 +329,6 @@ class CreateTests
       title = "it 'doesn\\'t retrieve data if not authenticated'"
       tests[title] = "do
             http = NiceHttp.new()
-            http.logger = @http.logger
             http.headers = {}
             resp = @http.#{request[:method]}(@request)
             expect(resp.code).to be_between('400', '499')\n"

@@ -12,13 +12,14 @@ ROOT_DIR = Pathname.new(__FILE__).join("..").join("..")
 # fex: HOST=myhosttotest
 ENV["HOST"] ||= "defaulthost"
 NiceHttp.host = ENV["HOST"]
+NiceHttp.log = :file_run
 # Add here the headers for authentication for example
 NiceHttp.headers = {
   Auhentication: "Token",
 }
 
 # Requests
-require_relative "../requests/uber.yaml"
+require_relative "../requests/uber.yaml.rb"
 
 require_relative "../spec/helper.rb"
 include Swagger::UberApi::V1_0_0

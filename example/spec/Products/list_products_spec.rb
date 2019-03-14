@@ -3,8 +3,7 @@ require_relative "../../settings/general"
 
 RSpec.describe Products, "#list_products" do
   before(:all) do
-    # create connection on default host and store the logs on the_name_of_file.rb.log
-    @http = NiceHttp.new({log: "#{__FILE__}.log"})
+    @http = NiceHttp.new()
     @latitude = Helper.latitude(@http)
     @longitude = Helper.longitude(@http)
     @request = Products.list_products(@latitude, @longitude)
@@ -19,7 +18,6 @@ RSpec.describe Products, "#list_products" do
   end
   it 'doesn\'t retrieve data if not authenticated' do
     http = NiceHttp.new()
-    http.logger = @http.logger
     http.headers = {}
     resp = @http.get(@request)
     expect(resp.code).to be_between("400", "499")
