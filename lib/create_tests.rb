@@ -300,6 +300,7 @@ class CreateTests
         before(:all) do
           @http = NiceHttp.new()
           #{params_declaration_txt}@request = #{req_txt}
+          @http.logger.info(\"\\n\#{'+'*50} Before All ends \#{'+'*50}\")
         end
         before(:each) do |example|
             @http.logger.info(\"\\n\\n\#{'='*100}\\nTest: \#{example.description}\\n\#{'-'*100}\")
@@ -330,7 +331,7 @@ class CreateTests
       tests[title] = "do
             http = NiceHttp.new()
             http.headers = {}
-            resp = @http.#{request[:method]}(@request)
+            resp = http.#{request[:method]}(@request)
             expect(resp.code).to be_between('400', '499')\n"
       if request.key?(:responses) and (request[:responses].keys.select{|c| c.to_s.to_i>=400&&c.to_s.to_i<=499}).size>0
       tests[title] += "expect(NiceHash.compare_structure(@request.responses[resp.code.to_sym].data, resp.data.json)).to eq true

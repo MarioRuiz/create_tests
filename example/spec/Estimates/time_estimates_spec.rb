@@ -7,6 +7,7 @@ RSpec.describe Estimates, "#time_estimates" do
     @start_latitude = Helper.start_latitude(@http)
     @start_longitude = Helper.start_longitude(@http)
     @request = Estimates.time_estimates(@start_latitude, @start_longitude)
+    @http.logger.info("\n#{"+" * 50} Before All ends #{"+" * 50}")
   end
   before(:each) do |example|
     @http.logger.info("\n\n#{"=" * 100}\nTest: #{example.description}\n#{"-" * 100}")
@@ -19,7 +20,7 @@ RSpec.describe Estimates, "#time_estimates" do
   it 'doesn\'t retrieve data if not authenticated' do
     http = NiceHttp.new()
     http.headers = {}
-    resp = @http.get(@request)
+    resp = http.get(@request)
     expect(resp.code).to be_between("400", "499")
   end
   it "returns error if required parameter missing" do

@@ -5,6 +5,7 @@ RSpec.describe User, "#profile_user" do
   before(:all) do
     @http = NiceHttp.new()
     @request = User.profile_user()
+    @http.logger.info("\n#{"+" * 50} Before All ends #{"+" * 50}")
   end
   before(:each) do |example|
     @http.logger.info("\n\n#{"=" * 100}\nTest: #{example.description}\n#{"-" * 100}")
@@ -17,7 +18,7 @@ RSpec.describe User, "#profile_user" do
   it 'doesn\'t retrieve data if not authenticated' do
     http = NiceHttp.new()
     http.headers = {}
-    resp = @http.get(@request)
+    resp = http.get(@request)
     expect(resp.code).to be_between("400", "499")
   end
 end
