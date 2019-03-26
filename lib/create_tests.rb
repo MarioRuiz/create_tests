@@ -241,7 +241,7 @@ class CreateTests
     private def create_helper(params, helper_txt)
       if helper_txt == ""
         output = "# for the case we want to use it standalone, not inside the project
-                    require '../settings/general' unless defined?(ROOT_DIR)
+                    require_relative '../settings/general' unless defined?(ROOT_DIR)
         
                     # On the methods you can pass the active http connection or none, then it will be created a new one.
                     # Examples from tests:
