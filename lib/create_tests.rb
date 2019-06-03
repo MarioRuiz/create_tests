@@ -340,30 +340,46 @@ class CreateTests
       tests[title] += "end\n"
             
       if params.size > 0
-        missing_param = ""
+        empty_param = ""
         params.each do |p|
           r = req_txt.gsub(/#{p}([),])/, '""\1')
-          missing_param += "
+          empty_param += "
                     request = #{r}
                     resp = @http.#{request[:method]}(request)
                     expect(resp.code).to be_between('400', '499')\n"
                     if request.key?(:responses) and (request[:responses].keys.select{|c| c.to_s.to_i>=400&&c.to_s.to_i<=499}).size>0
-                      missing_param += "expect(resp.message).to match /\#{request.responses[resp.code.to_sym].message}/i\n"
+                      empty_param += "expect(resp.message).to match /\#{request.responses[resp.code.to_sym].message}/i\n"
                     end
         end
-        missing_param += "end\n"
-        tests["it 'returns error if required parameter missing' "] = "do\n#{missing_param}"
+        empty_param += "end\n"
+        tests["it 'returns error if required parameter empty' "] = "do\n#{empty_param}"
       end
 
       if request.key?(:data) and request.key?(:data_required)
+        empty_param_data = ""
+        empty_param_data += "
+                @request[:data_required].each do |p|
+                  request = @request.deep_copy
+                  request.values_for[p] = ''
+                  resp = @http.#{request[:method]}(request)
+                  expect(resp.code).not_to be_between('200', '299')
+                    if request.responses.key?(resp.code.to_sym)
+                      expect(resp.message).to match /\#{request.responses[resp.code.to_sym].message}/i
+                    end
+                end
+            "
+        empty_param_data += "end\n"
+        tests["it 'returns error if required parameter on data empty' do\n"] = empty_param_data
+
         missing_param_data = ""
         missing_param_data += "
                 @request[:data_required].each do |p|
-                    @request.values_for = { p => '' }
-                    resp = @http.#{request[:method]}(@request)
-                    expect(resp.code).not_to be_between('200', '299')
-                    if @request.responses.key?(resp.code.to_sym)
-                    expect(resp.message).to match /\#{@request.responses[resp.code.to_sym].message}/i
+                  request = @request.deep_copy
+                  NiceHash.delete_nested(request[:data], p)
+                  resp = @http.#{request[:method]}(request)
+                  expect(resp.code).not_to be_between('200', '299')
+                    if request.responses.key?(resp.code.to_sym)
+                      expect(resp.message).to match /\#{request.responses[resp.code.to_sym].message}/i
                     end
                 end
             "
