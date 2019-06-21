@@ -281,7 +281,7 @@ class CreateTests
       end
       req_txt += params.join(", ")
       req_txt += ")"
-      request = eval("#{module_txt}.#{req_txt}")
+      request = eval("require 'nice_hash';#{module_txt}.#{req_txt}")
 
       req_txt = "#{mod_name}.#{req_txt}"
       params_declaration_txt = ""

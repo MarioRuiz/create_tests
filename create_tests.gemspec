@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'create_tests'
-  s.version     = '0.4.0'
+  s.version     = '0.4.1'
   s.summary     = "CreateTests -- Create Tests automatically from a Requests file. Perfect to be used with the result from importing a Swagger file using the open_api_import gem"
   s.description = "CreateTests -- Create Tests automatically from a Requests file. Perfect to be used with the result from importing a Swagger file using the open_api_import gem"
   s.authors     = ["Mario Ruiz"]
@@ -10,6 +10,7 @@ Gem::Specification.new do |s|
   s.homepage    = 'https://github.com/MarioRuiz/create_tests'
   s.license       = 'MIT'
   s.add_runtime_dependency 'rufo', '~> 0.4', '>= 0.4.1'
+  s.add_runtime_dependency 'nice_hash', '~> 1.12', '>= 1.12.14'
   s.add_development_dependency 'rspec', '~> 3.8', '>= 3.8.0'
   s.add_development_dependency 'coveralls', '~> 0.8', '>= 0.8.22'
   s.test_files    = s.files.grep(%r{^(test|spec|features)/})
