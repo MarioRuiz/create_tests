@@ -399,7 +399,10 @@ class CreateTests
           modified = true
           message = " = test added #{k} for #{method_txt}"
           @logger.info message
-          puts message unless test_txt == ''
+          unless test_txt == ''
+            puts message
+            output +="# Appended #{Time.now.stamp}\n"
+          end
           output += "#{k}#{v}"
         end
       end
