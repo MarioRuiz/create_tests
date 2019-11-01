@@ -65,9 +65,11 @@ class CreateTests
       @logger.warn message
       warn message
     elsif mode == :append
-      message = "** Pay attention, if any of the test files exist or the help file exist only will be added the tests, methods that are missing."
-      @logger.warn message
-      warn message
+      if Dir["./spec/*/**_spec.rb"].size > 0
+        message = "** Pay attention, if any of the test files exist or the help file exist only will be added the tests, methods that are missing."
+        @logger.warn message
+        warn message
+      end
     end
 
     @params = Array.new
