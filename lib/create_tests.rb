@@ -394,8 +394,8 @@ class CreateTests
       end
 
       tests.each do |k,v|
-        unless output.include?(k.gsub(" '",' "').gsub("' ",'" ')) or 
-          output.include?(k.gsub(' "'," '").gsub('" ',"' "))
+        unless output.include?(k.gsub(" '",' "').gsub("' ",'" ').gsub("\n",'').gsub(/\s+do$/,'').gsub(/^\s*it/,'')) or 
+          output.include?(k.gsub(' "'," '").gsub('" ',"' ").gsub("\n",'').gsub(/\s+do$/,'').gsub(/^\s*it/,''))
           modified = true
           message = " = test added #{k} for #{method_txt}"
           @logger.info message
