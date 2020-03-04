@@ -9,9 +9,12 @@ class CreateTests
       mod_name = module_txt.scan(/::(\w+)$/).join
       req_txt = "#{method_txt}("
       params = []
+      keywords_required = []
       method_obj.parameters.each do |p|
         if p[0] == :req #required
           params << "@#{p[1]}"
+        elsif p[0] == :key and Object.const_defined?(p[1].to_s.upcase)
+          keywords_required << p[1]
         end
       end
       req_txt += params.join(", ")
@@ -78,7 +81,7 @@ class CreateTests
       end
       tests[title] += "end\n"
             
-      if params.size > 0
+      if params.size > 0 or keywords_required.size >0
         empty_param = ""
         params.each do |p|
           r = req_txt.gsub(/#{p}([),])/, '""\1')
@@ -89,6 +92,18 @@ class CreateTests
                     if request.key?(:responses) and (request[:responses].keys.select{|c| c.to_s.to_i>=400&&c.to_s.to_i<=499}).size>0
                       empty_param += "expect(resp.message).to match /\#{request.responses[resp.code.to_sym].message}/i\n"
                     end
+        end
+        if keywords_required.size > 0 
+          r = req_txt.scan(/(.+)\(/).join
+          empty_param += "
+                    [:#{keywords_required.join(', :')}].each do |kw|
+                      request = #{r}(kw => '')
+                      resp = @http.#{request[:method]}(request)
+                      expect(resp.code).to be_between('400', '499')\n"
+          if request.key?(:responses) and (request[:responses].keys.select{|c| c.to_s.to_i>=400&&c.to_s.to_i<=499}).size>0
+            empty_param += "expect(resp.message).to match /\#{request.responses[resp.code.to_sym].message}/i\n"
+          end
+          empty_param += "end\n"
         end
         empty_param += "end\n"
         tests["it 'returns error if required parameter empty' "] = "do\n#{empty_param}"
