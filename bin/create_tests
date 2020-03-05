@@ -34,5 +34,5 @@ if filename.to_s==''
   puts optparse
   puts "** Need to specify at least a requests file."
 else
-  CreateTests.from filename, options
+  CreateTests.from filename, **options
 end
