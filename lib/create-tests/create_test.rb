@@ -33,16 +33,16 @@ class CreateTests
         modified = true
         output = "
         require_relative '../../settings/general'
-
-        RSpec.describe #{mod_name}, '##{method_txt}' do
-        before(:all) do
-          @http = NiceHttp.new()
-          #{params_declaration_txt}@request = #{req_txt}
-          @http.logger.info(\"\\n\#{'+'*50} Before All ends \#{'+'*50}\")
-        end
-        before(:each) do |example|
-            @http.logger.info(\"\\n\\n\#{'='*100}\\nTest: \#{example.description}\\n\#{'-'*100}\")
-        end\n"
+        if defined?(#{mod_name})
+          RSpec.describe #{mod_name}, '##{method_txt}' do
+          before(:all) do
+            @http = NiceHttp.new()
+            #{params_declaration_txt}@request = #{req_txt}
+            @http.logger.info(\"\\n\#{'+'*50} Before All ends \#{'+'*50}\")
+          end
+          before(:each) do |example|
+              @http.logger.info(\"\\n\\n\#{'='*100}\\nTest: \#{example.description}\\n\#{'-'*100}\")
+          end\n"
       else
         output = test_txt
         output.gsub!(/\s*end\s*\Z/,"\n")
@@ -154,7 +154,7 @@ class CreateTests
           output += "#{k}#{v}"
         end
       end
-      output += "\nend"
+      output += "\nend\nend"
       return modified, output
     end
   end
