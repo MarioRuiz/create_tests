@@ -33,7 +33,7 @@ class CreateTests
         modified = true
         output = "
         require_relative '../../settings/general'
-        if defined?(#{mod_name})
+        if defined?(#{mod_name}) and defined?(#{mod_name}.#{method_txt})
           RSpec.describe #{mod_name}, '##{method_txt}' do
           before(:all) do
             @http = NiceHttp.new()
@@ -45,7 +45,11 @@ class CreateTests
           end\n"
       else
         output = test_txt
-        output.gsub!(/\s*end\s*\Z/,"\n")
+        if output.match?(/\s*end\s*end\s*end\s*\Z/)
+          output.gsub!(/\s*end\s*end\s*\Z/,"\n")
+        else
+          output.gsub!(/\s*end\s*\Z/,"\n")
+        end
       end
 
 
@@ -154,7 +158,11 @@ class CreateTests
           output += "#{k}#{v}"
         end
       end
-      output += "\nend\nend"
+      if output.include?('defined?(')
+        output += "\nend\nend"
+      else
+        output +="\nend"
+      end
       return modified, output
     end
   end
