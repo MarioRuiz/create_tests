@@ -1,8 +1,6 @@
 # CreateTests
 
 [![Gem Version](https://badge.fury.io/rb/create_tests.svg)](https://rubygems.org/gems/create_tests)
-
-[![Gem Version](https://badge.fury.io/rb/create_tests.svg)](https://rubygems.org/gems/create_tests)
 [![Build Status](https://travis-ci.com/MarioRuiz/create_tests.svg?branch=master)](https://github.com/MarioRuiz/create_tests)
 [![Coverage Status](https://coveralls.io/repos/github/MarioRuiz/create_tests/badge.svg?branch=master)](https://coveralls.io/github/MarioRuiz/create_tests?branch=master)
 ![Gem](https://img.shields.io/gem/dt/create_tests)
