@@ -13,7 +13,7 @@ class CreateTests
       method_obj.parameters.each do |p|
         if p[0] == :req #required
           params << "@#{p[1]}"
-        elsif p[0] == :key and Object.const_defined?(p[1].to_s.upcase)
+        elsif p[0] == :key and p[1].to_s.match?(/^[a-z]/i) and Object.const_defined?(p[1].to_s.upcase)
           keywords_required << p[1]
         end
       end
