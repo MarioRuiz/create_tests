@@ -25,6 +25,10 @@ RSpec.describe CreateTests, '.from' do
     it 'raises error for invalid cleanup parameter' do
       expect { CreateTests.from(requests_file, cleanup: :nope) }.to raise_error(RuntimeError, /Wrong cleanup/)
     end
+
+    it 'raises error for invalid only parameter' do
+      expect { CreateTests.from(requests_file, only: :bogus, return_data: true) }.to raise_error(RuntimeError, /Wrong only/)
+    end
   end
 
   describe 'return_data option' do
@@ -101,6 +105,47 @@ RSpec.describe CreateTests, '.from' do
       helper_key = result.keys.find { |k| k.include?("test/spec/helper.rb") }
       expect(settings_key).not_to be_nil
       expect(helper_key).not_to be_nil
+    end
+  end
+
+  describe 'only option' do
+    it 'generates only the selected test kinds' do
+      result = CreateTests.from(requests_file, return_data: true, only: [:success, :auth])
+      spec = result.values.find { |v| v.include?("RSpec.describe") }
+      expect(spec).to include("has correct structure in successful response")
+      expect(spec).to include("doesn\\'t retrieve data if not authenticated")
+      expect(spec).not_to include("returns error if required parameter empty")
+      expect(spec).not_to include("handles multiple valid data variations")
+    end
+
+    it 'accepts a comma-separated string for only' do
+      result = CreateTests.from(requests_file, return_data: true, only: "success")
+      spec = result.values.find { |v| v.include?("RSpec.describe") }
+      expect(spec).to include("has correct structure in successful response")
+      expect(spec).not_to include("doesn\\'t retrieve data if not authenticated")
+    end
+  end
+
+  describe 'minitest output' do
+    it 'writes *_test.rb under ./test by default' do
+      result = CreateTests.from(requests_file, return_data: true, test: :minitest)
+      test_keys = result.keys.select { |k| k.include?("_test.rb") }
+      expect(test_keys).not_to be_empty
+      expect(test_keys.first).to start_with("./test/")
+      content = result[test_keys.first]
+      expect(content).to include("require 'minitest/autorun'")
+      expect(content).to include("Minitest::Test")
+      expect(content).to include("def setup")
+      expect(content).to include("def teardown")
+      expect(content).to include("assert_equal")
+      expect(content).not_to include("RSpec.describe")
+      expect(content).not_to include("expect(")
+    end
+
+    it 'honors an explicit spec_dir with minitest' do
+      result = CreateTests.from(requests_file, return_data: true, test: :minitest, spec_dir: './spec')
+      test_keys = result.keys.select { |k| k.include?("_test.rb") }
+      expect(test_keys.first).to start_with("./spec/")
     end
   end
 
@@ -363,16 +408,55 @@ RSpec.describe CreateTests, '.from' do
       end
     end
 
-    it 'leaves existing setup and cleanup files unchanged in append mode' do
+    it 'appends only missing setup/cleanup methods in append mode' do
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) do
+          with_chain_api(tmpdir) do |req_file|
+            CreateTests.from(req_file, mode: :overwrite)
+            custom_setup = <<~RUBY
+              require 'ostruct'
+              module Helper
+              def self.setup_accounts(http, subscription_id, account_name)
+                # custom body kept
+                OpenStruct.new(state: 'Succeeded')
+              end
+              end
+            RUBY
+            File.write("./helper/setup.rb", custom_setup)
+            CreateTests.from(req_file, mode: :append)
+            setup = File.read("./helper/setup.rb")
+            expect(setup).to include("# custom body kept")
+            expect(setup).to include("def self.setup_accounts(")
+            expect(setup).to include("def self.setup_volumes(")
+          end
+        end
+      end
+    end
+
+    it 'does not rewrite setup/cleanup when every method already exists' do
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) do
+          with_chain_api(tmpdir) do |req_file|
+            CreateTests.from(req_file, mode: :overwrite)
+            original_setup = File.read("./helper/setup.rb")
+            FileUtils.touch("./helper/setup.rb", mtime: Time.now - 60)
+            mtime_before = File.mtime("./helper/setup.rb")
+            CreateTests.from(req_file, mode: :append)
+            expect(File.read("./helper/setup.rb")).to eq(original_setup)
+            expect(File.mtime("./helper/setup.rb")).to eq(mtime_before)
+          end
+        end
+      end
+    end
+
+    it 'leaves existing setup and cleanup files untouched in dont_overwrite mode' do
       Dir.mktmpdir do |tmpdir|
         Dir.chdir(tmpdir) do
           with_chain_api(tmpdir) do |req_file|
             CreateTests.from(req_file, mode: :overwrite)
             File.write("./helper/setup.rb", "# user setup")
             File.write("./helper/cleanup.rb", "# user cleanup")
-            expect {
-              CreateTests.from(req_file, mode: :append)
-            }.to output(/left unchanged/).to_stderr
+            CreateTests.from(req_file, mode: :dont_overwrite)
             expect(File.read("./helper/setup.rb")).to eq("# user setup")
             expect(File.read("./helper/cleanup.rb")).to eq("# user cleanup")
           end

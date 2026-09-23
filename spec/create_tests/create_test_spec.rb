@@ -639,6 +639,48 @@ RSpec.describe CreateTests, '#create_test' do
     end
   end
 
+  describe 'only and minitest generation' do
+    it 'filters examples by only:' do
+      _modified, output = generate(:post_with_data, only: [:success, :mock])
+      expect(output).to include("has correct structure in successful response")
+      expect(output).not_to include("doesn\\'t retrieve data if not authenticated")
+      expect(output).not_to include("handles multiple valid data variations")
+      expect(output).not_to include("returns error when individual data fields are invalid")
+    end
+
+    it 'raises for unknown only kinds' do
+      expect {
+        generate(:no_params_endpoint, only: [:nope])
+      }.to raise_error(RuntimeError, /Wrong only/)
+    end
+
+    it 'generates Minitest classes with assert helpers' do
+      _modified, output = generate(:no_params_endpoint, test: :minitest)
+      expect(output).to include("require 'minitest/autorun'")
+      expect(output).to include("class ProductsNoParamsEndpointTest < Minitest::Test")
+      expect(output).to include("def setup")
+      expect(output).to include("def teardown")
+      expect(output).to include("def test_has_correct_structure_in_successful_response")
+      expect(output).to include("assert_equal")
+      expect(output).to include("assert_includes")
+      expect(output).not_to include("expect(")
+      expect(output).not_to include("RSpec.describe")
+    end
+
+    it 'does not duplicate minitest methods in append mode' do
+      _modified, first = generate(:no_params_endpoint, test: :minitest)
+      modified, second = generate(:no_params_endpoint, first, test: :minitest)
+      expect(modified).to be false
+      expect(second.scan("def test_has_correct_structure_in_successful_response").size).to eq(1)
+    end
+
+    it 'maps hierarchical setup expectations for minitest' do
+      _modified, output = generate(:create_or_update, mod_path: "TestApiHierarchical::Volumes", test: :minitest)
+      expect(output).to include("assert_equal 'Succeeded', Helper.setup_capacity_pools(")
+      expect(output).to match(/@volume_name = @volume_name \+ "-createorupda"/)
+    end
+  end
+
   describe 'prerequisite setup and cleanup generation' do
     it 'wraps setup call in expect(...state).to eq Succeeded' do
       _modified, output = generate(:create_or_update, mod_path: "TestApiHierarchical::Volumes")
@@ -764,12 +806,12 @@ RSpec.describe CreateTests, '#create_test' do
 
     it 'appends per-spec suffix to last param for unique resource names' do
       _modified, output = generate(:delete, mod_path: "TestApiHierarchical::Snapshots")
-      expect(output).to match(/@snapshot_name = @snapshot_name \+ "-del"/)
+      expect(output).to match(/@snapshot_name = @snapshot_name \+ "-delete"/)
     end
 
-    it 'derives suffix from method name' do
+    it 'derives suffix from method name without underscores, capped at 12' do
       _modified, output = generate(:create_or_update, mod_path: "TestApiHierarchical::Volumes")
-      expect(output).to match(/@volume_name = @volume_name \+ "-cre"/)
+      expect(output).to match(/@volume_name = @volume_name \+ "-createorupda"/)
     end
   end
 end

@@ -125,5 +125,71 @@ class CreateTests
         end
         best
       end
+
+      # Append only missing setup_/cleanup_ methods from generated content into an
+      # existing file. Existing method bodies are left untouched.
+      # @return [Array(String, Boolean)] merged content and whether anything was added
+      private def append_missing_chain_methods(existing_txt, generated_txt)
+        method_blocks = extract_chain_method_blocks(generated_txt)
+        missing = method_blocks.reject { |blk| existing_txt.include?("def self.#{blk[:name]}(") }
+        return [existing_txt, false] if missing.empty?
+
+        output = existing_txt.dup
+        insert = missing.map { |blk| blk[:text] }.join
+
+        if output.match?(/\bmodule\s+Helper\b/)
+          if output.match?(/\s*end\s*\Z/)
+            output.sub!(/\s*end\s*\Z/, "\n#{insert}\nend\n")
+          else
+            output << "\n#{insert}"
+          end
+        else
+          # Preserve leading require (e.g. ostruct) from generated content when wrapping.
+          require_line = generated_txt[/^require[^\n]*\n/]
+          prefix = require_line && !output.include?(require_line.strip) ? require_line : ""
+          output = "#{prefix}module Helper\n#{output.chomp}\n#{insert}\nend\n"
+        end
+
+        [output, true]
+      end
+
+      private def extract_chain_method_blocks(generated_txt)
+        blocks = []
+        lines = generated_txt.lines
+        i = 0
+        while i < lines.size
+          if lines[i] =~ /\A#/
+            comment_start = i
+            i += 1 while i < lines.size && lines[i] =~ /\A#/
+            if i < lines.size && lines[i] =~ /\Adef self\.(setup_\w+|cleanup_\w+)\(/
+              name = $1
+              start = comment_start
+              i += 1
+              depth = 1
+              while i < lines.size && depth > 0
+                depth += 1 if lines[i] =~ /\A\s*def\b/
+                depth -= 1 if lines[i] =~ /\Aend\b/
+                i += 1
+              end
+              blocks << { name: name, text: lines[start...i].join }
+              next
+            end
+          elsif lines[i] =~ /\Adef self\.(setup_\w+|cleanup_\w+)\(/
+            name = $1
+            start = i
+            i += 1
+            depth = 1
+            while i < lines.size && depth > 0
+              depth += 1 if lines[i] =~ /\A\s*def\b/
+              depth -= 1 if lines[i] =~ /\Aend\b/
+              i += 1
+            end
+            blocks << { name: name, text: lines[start...i].join }
+            next
+          end
+          i += 1
+        end
+        blocks
+      end
     end
   end

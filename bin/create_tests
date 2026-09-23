@@ -37,6 +37,23 @@ optparse = OptionParser.new do |opts|
     options[:cleanup] = false
   end
 
+  opts.on("--spec_dir DIR", "Output directory for generated test files (default: ./spec, or ./test with --minitest)") do |dir|
+    options[:spec_dir] = dir
+  end
+
+  opts.on("--settings_dir DIR", "Output directory for generated settings files (default: ./settings)") do |dir|
+    options[:settings_dir] = dir
+  end
+
+  opts.on("--only KIND", "Generate only these test kinds (repeatable or comma-separated). Kinds: success, auth, required_params, mock, variations, invalid_fields, required_data") do |kind|
+    options[:only] ||= []
+    options[:only].concat(kind.split(",").map { |s| s.strip.to_sym })
+  end
+
+  opts.on("--minitest", "Generate Minitest tests instead of RSpec") do
+    options[:test] = :minitest
+  end
+
   opts.on("-v", "--version", "Show version") do
     puts "create_tests #{CreateTests::VERSION}"
     exit

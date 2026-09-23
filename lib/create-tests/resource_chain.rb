@@ -3,9 +3,15 @@ class CreateTests
 
   class << self
 
+    SKIP_CHAIN_SEGMENTS = %w[subscriptions resource_groups providers].freeze
+
     # Extracts the resource dependency chain from a request path.
     # Works with both placeholder paths ({param}) and interpolated paths
     # (where params are resolved, possibly to empty strings).
+    #
+    # Segments whose snake_case names are subscriptions, resource_groups, or
+    # providers are omitted from the setup/cleanup chain, but their parameters
+    # remain in params_up_to for later resources.
     #
     # @param request [Hash] Request hash containing :path and :method keys
     # @param params [Array<String>] Positional parameter names (e.g. ["@subscription_id", "@pool_name"])
@@ -73,8 +79,14 @@ class CreateTests
         { resource: resource_name, param: matching_param, params_up_to: params_up_to }
       end
 
-      prerequisites = all_entries[0..-2]
-      target = all_entries.last
+      # Drop Azure infrastructure segments from the chain; keep their params in params_up_to.
+      real_entries = all_entries.reject { |e| SKIP_CHAIN_SEGMENTS.include?(e[:resource]) }
+
+      return [], nil if real_entries.empty?
+      return [], real_entries.first if real_entries.size == 1
+
+      prerequisites = real_entries[0..-2]
+      target = real_entries.last
 
       return prerequisites, target
     end

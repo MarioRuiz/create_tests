@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-23
+
+### Added
+- **CLI `--spec_dir` / `--settings_dir`**: Pass custom output directories through to `CreateTests.from`.
+- **`only:` / `--only`**: Generate a subset of example kinds (`success`, `auth`, `required_params`, `mock`, `variations`, `invalid_fields`, `required_data`). Repeatable CLI flag or comma-separated list; unknown kinds raise.
+- **Minitest output**: `test: :minitest` and CLI `--minitest` generate `*_test.rb` (default dir `./test` when `spec_dir` is omitted). Shared assertion helpers map RSpec-style expectations to `assert_*` / `refute_*`. Hooks map to `setup` / `teardown`.
+- Gemspec metadata: `changelog_uri`, `source_code_uri`, `bug_tracker_uri`.
+
+### Changed
+- **Unique resource suffixes**: Derived from the method name with underscores removed, capped at 12 characters (`create` → `-create`, `create_or_update` → `-createorupda`, `delete` → `-delete`).
+- **Append setup/cleanup**: Append mode inserts only missing `def self.setup_*` / `def self.cleanup_*` methods and leaves existing bodies untouched. A file that already has every method is not rewritten. `:dont_overwrite` still leaves the file untouched; `:overwrite` still replaces it.
+- **Resource chain**: Path segments `subscriptions`, `resource_groups`, and `providers` are omitted from the setup/cleanup chain; their parameters remain in `params_up_to` for later resources.
+- CI: `actions/checkout@v4` → `@v5`.
+
 ## [1.1.0] - 2026-09-23
 
 ### Added

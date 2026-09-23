@@ -39,43 +39,44 @@ RSpec.describe CreateTests, '#extract_resource_chain' do
     expect(target).to be_nil
   end
 
-  it 'extracts prerequisites from interpolated path with empty param slots' do
+  it 'skips subscriptions and resource_groups; sole real resource is the target' do
     request = {
       path: "/subscriptions//resourceGroups//providers/Microsoft.NetApp/netAppAccounts//?api-version=2019",
       method: :get
     }
     params = ["@subscription_id", "@resource_group_name", "@account_name"]
     chain, target = extract(request, params)
-    expect(chain.size).to eq(2)
-    expect(chain[0][:resource]).to eq("subscriptions")
-    expect(chain[1][:resource]).to eq("resource_groups")
+    expect(chain).to eq([])
     expect(target[:resource]).to eq("net_app_accounts")
+    expect(target[:params_up_to]).to eq(["@subscription_id", "@resource_group_name", "@account_name"])
   end
 
-  it 'extracts multiple prerequisites from deep interpolated path' do
+  it 'extracts real-resource prerequisites from deep interpolated path' do
     request = {
       path: "/subscriptions//resourceGroups//providers/Microsoft.NetApp/netAppAccounts//capacityPools//volumes/?api-version=2019",
       method: :put
     }
     params = ["@subscription_id", "@resource_group_name", "@account_name", "@pool_name", "@volume_name"]
     chain, target = extract(request, params)
-    expect(chain.size).to eq(4)
+    expect(chain.size).to eq(2)
     resources = chain.map { |r| r[:resource] }
-    expect(resources).to eq(["subscriptions", "resource_groups", "net_app_accounts", "capacity_pools"])
+    expect(resources).to eq(["net_app_accounts", "capacity_pools"])
     expect(target[:resource]).to eq("volumes")
   end
 
-  it 'builds correct params_up_to for each level' do
+  it 'keeps infra params in params_up_to for real resources' do
     request = {
       path: "/subscriptions//resourceGroups//providers/Microsoft.NetApp/netAppAccounts//capacityPools//?api-version=2019",
       method: :put
     }
     params = ["@subscription_id", "@resource_group_name", "@account_name", "@pool_name"]
-    chain, _target = extract(request, params)
+    chain, target = extract(request, params)
 
-    expect(chain[0][:params_up_to]).to eq(["@subscription_id"])
-    expect(chain[1][:params_up_to]).to eq(["@subscription_id", "@resource_group_name"])
-    expect(chain[2][:params_up_to]).to eq(["@subscription_id", "@resource_group_name", "@account_name"])
+    expect(chain.size).to eq(1)
+    expect(chain[0][:resource]).to eq("net_app_accounts")
+    expect(chain[0][:params_up_to]).to eq(["@subscription_id", "@resource_group_name", "@account_name"])
+    expect(target[:resource]).to eq("capacity_pools")
+    expect(target[:params_up_to]).to eq(["@subscription_id", "@resource_group_name", "@account_name", "@pool_name"])
   end
 
   it 'target includes all params up to its level' do
@@ -88,17 +89,28 @@ RSpec.describe CreateTests, '#extract_resource_chain' do
     expect(target[:params_up_to]).to eq(["@subscription_id", "@resource_group_name", "@account_name"])
   end
 
-  it 'works with placeholder-style paths' do
+  it 'skips infra segments in placeholder-style paths' do
     request = {
       path: "/subscriptions/{sub}/resourceGroups/{rg}/accounts/{acct}?v=1",
       method: :get
     }
     params = ["@sub", "@rg", "@acct"]
     chain, target = extract(request, params)
-    expect(chain.size).to eq(2)
-    expect(chain[0][:resource]).to eq("subscriptions")
-    expect(chain[1][:resource]).to eq("resource_groups")
+    expect(chain).to eq([])
     expect(target[:resource]).to eq("accounts")
+    expect(target[:params_up_to]).to eq(["@sub", "@rg", "@acct"])
+  end
+
+  it 'skips providers when it appears as a resource pair' do
+    request = {
+      path: "/subscriptions/{sub}/providers/{provider}/accounts/{acct}",
+      method: :get
+    }
+    params = ["@sub", "@provider", "@acct"]
+    chain, target = extract(request, params)
+    expect(chain).to eq([])
+    expect(target[:resource]).to eq("accounts")
+    expect(target[:params_up_to]).to eq(["@sub", "@provider", "@acct"])
   end
 
   it 'converts camelCase resource names to snake_case' do

@@ -21,6 +21,11 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
   s.executables << 'create_tests'
   s.required_ruby_version = '>= 3.0'
+  s.metadata = {
+    "changelog_uri" => "https://github.com/MarioRuiz/create_tests/blob/master/CHANGELOG.md",
+    "source_code_uri" => "https://github.com/MarioRuiz/create_tests",
+    "bug_tracker_uri" => "https://github.com/MarioRuiz/create_tests/issues",
+  }
   s.post_install_message = "Thanks for installing! Visit us on https://github.com/MarioRuiz/create_tests"
 end
 
