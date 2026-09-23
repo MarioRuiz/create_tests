@@ -2,6 +2,7 @@
 
 [![Gem Version](https://badge.fury.io/rb/create_tests.svg)](https://rubygems.org/gems/create_tests)
 [![CI](https://github.com/MarioRuiz/create_tests/actions/workflows/ci.yml/badge.svg)](https://github.com/MarioRuiz/create_tests/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/MarioRuiz/create_tests/master/.github/badges/coverage.json)](https://github.com/MarioRuiz/create_tests/actions/workflows/ci.yml)
 ![Gem](https://img.shields.io/gem/dt/create_tests)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/y/MarioRuiz/create_tests)
 ![GitHub last commit](https://img.shields.io/github/last-commit/MarioRuiz/create_tests)
