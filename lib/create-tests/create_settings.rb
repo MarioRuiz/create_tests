@@ -4,7 +4,7 @@ class CreateTests
     class << self
   
       # Create the settings file
-      private def create_settings(requests_file_orig, modules_to_include)
+      private def create_settings(requests_relative_path, modules_to_include, helper_relative_path: '../spec/helper.rb')
         output = "# required libraries
           require 'nice_http'
           require 'nice_hash'
@@ -22,12 +22,12 @@ class CreateTests
           NiceHttp.log = :file_run
           # Add here the headers for authentication for example
           NiceHttp.headers = {
-              Auhentication: 'Token'
+              Authentication: 'Token'
           }
   
           # Requests
-          require_relative '.#{requests_file_orig}'\n
-          require_relative '../spec/helper.rb'\n"
+          require_relative '#{requests_relative_path}'\n
+          require_relative '#{helper_relative_path}'\n"
   
         modules_to_include.each do |m|
           output += "include #{m}\n"

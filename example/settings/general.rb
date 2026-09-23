@@ -15,7 +15,7 @@ NiceHttp.host = ENV["HOST"]
 NiceHttp.log = :file_run
 # Add here the headers for authentication for example
 NiceHttp.headers = {
-  Auhentication: "Token",
+  Authentication: "Token",
 }
 
 # Requests

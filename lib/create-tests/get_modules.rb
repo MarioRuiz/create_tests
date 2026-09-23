@@ -6,13 +6,13 @@ class CreateTests
     # fex: ['Swagger::UberApi::V1_0_0::Products', 'Swagger::UberApi::V1_0_0::Cities']
     private def get_modules(mod)
       modules = []
-      mod = eval(mod) if mod.kind_of?(String)
+      mod = Object.const_get(mod) if mod.is_a?(String)
       mod.constants.each do |m|
-        o = eval ("#{mod}::#{m}.constants")
-        if o.size == 0
+        child = mod.const_get(m)
+        if child.constants.empty?
           modules << "#{mod}::#{m}"
         else
-          modules = get_modules("#{mod}::#{m}")
+          modules += get_modules("#{mod}::#{m}")
         end
       end
       modules

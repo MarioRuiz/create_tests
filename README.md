@@ -1,22 +1,17 @@
 # CreateTests
 
 [![Gem Version](https://badge.fury.io/rb/create_tests.svg)](https://rubygems.org/gems/create_tests)
-[![Build Status](https://travis-ci.com/MarioRuiz/create_tests.svg?branch=master)](https://github.com/MarioRuiz/create_tests)
-[![Coverage Status](https://coveralls.io/repos/github/MarioRuiz/create_tests/badge.svg?branch=master)](https://coveralls.io/github/MarioRuiz/create_tests?branch=master)
+[![CI](https://github.com/MarioRuiz/create_tests/actions/workflows/ci.yml/badge.svg)](https://github.com/MarioRuiz/create_tests/actions/workflows/ci.yml)
 ![Gem](https://img.shields.io/gem/dt/create_tests)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/y/MarioRuiz/create_tests)
 ![GitHub last commit](https://img.shields.io/github/last-commit/MarioRuiz/create_tests)
 ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/MarioRuiz/create_tests)
 
+Create RSpec tests automatically from Request Hash files. Perfect to be used with the result from importing a Swagger / OpenAPI file using the [open_api_import](https://github.com/MarioRuiz/open_api_import) gem.
 
-Create Tests automatically from a Requests file. Perfect to be used with the result from importing a Swagger file using the open_api_import gem. Now we are supporting RSpec.
+We strongly recommend using [nice_http](https://github.com/MarioRuiz/nice_http) for your tests together with [nice_hash](https://github.com/MarioRuiz/nice_hash) and [string_pattern](https://github.com/MarioRuiz/string_pattern).
 
-More info about the Request Hashes: https://github.com/MarioRuiz/Request-Hash
-
-If you want to know how to import Swagger / Open API files in just a couple of seconds and transform them into Request Ruby Hashes: https://github.com/MarioRuiz/open_api_import
-
-We strongly recommend to use nice_http gem for your tests: https://github.com/MarioRuiz/nice_http
-
+More info about Request Hashes: https://github.com/MarioRuiz/Request-Hash
 
 ## Installation
 
@@ -24,51 +19,205 @@ Install it yourself as:
 
     $ gem install create_tests
 
+**Requirements:** Ruby >= 3.0
 
-Take in consideration create_tests gem is using the 'rufo' gem that executes in command line the `rufo` command. In case you experience any trouble with it, visit: https://github.com/ruby-formatter/rufo
+The gem uses [rufo](https://github.com/ruby-formatter/rufo) to format generated files. In case you experience any trouble with it, visit: https://github.com/ruby-formatter/rufo
 
 ## Usage
 
-After installation you can run using command line executable or just from Ruby.
+After installation you can run using the command line executable or from Ruby code.
 
-The execution will create an spec folder where you will have all the RSpec tests. Also it will be added to that file a `helper.rb` file.
+The execution will create:
+- A `spec/` folder with one RSpec test file per API endpoint
+- A `spec/helper.rb` with stub methods for required parameters
+- A `settings/general.rb` with NiceHttp configuration boilerplate
 
-Also a `settings` folder that will contain a `general.rb` file that will be required by the tests.
+### Command line
 
-### Executable
+```
+Usage: create_tests [requests_file] [options]
 
-For help and see the options, run in command line / bash: `create_tests -h`
-
-Example: 
-```bash
- create_tests ./requests/uber.yaml.rb
+    -n, --dont_overwrite    In case the test file exists it won't change anything
+    -w, --overwrite         In case the test file exists it will be overwritten
+    -a, --append            Only missing tests will be appended (default)
+    -d, --dry_run           Preview which files would be created or modified
+        --cleanup_each      Generate cleanup in after(:each) instead of after(:all)
+        --no_cleanup        Do not generate setup/cleanup hooks
+    -v, --version           Show version
 ```
 
-### Ruby file
-Write your ruby code on a file and in command line/bash: `ruby my_file.rb`
+Example:
 
-This is an example:
+```bash
+create_tests ./requests/uber.yaml.rb
+```
+
+Dry run (preview without writing files):
+
+```bash
+create_tests ./requests/uber.yaml.rb --dry_run
+```
+
+### Ruby API
 
 ```ruby
-  require 'create_tests'
-  
-  CreateTests.from "./requests/uber.yaml.rb"
+require 'create_tests'
 
+CreateTests.from "./requests/uber.yaml.rb"
 ```
+
+## Generated tests
+
+For each API endpoint, `create_tests` generates up to 7 test types:
+
+1. **"has correct structure in successful response"** -- Calls the endpoint and validates the response structure using `NiceHttp.validate_response` with diff details on failure.
+
+2. **"doesn't retrieve data if not authenticated"** -- Calls with empty headers and asserts a 4xx response.
+
+3. **"returns error if required parameter empty"** -- For each required parameter, sends an empty string and expects a 4xx response.
+
+4. **"returns expected mock response"** -- For endpoints with `mock_response` data (from `open_api_import`), validates the mock response matches the expected code, message, and structure.
+
+5. **"handles multiple valid data variations"** -- For POST/PUT/PATCH endpoints with data, uses `generate_n(5, :correct)` from nice_hash to test 5 different valid payload variations.
+
+6. **"returns error when individual data fields are invalid"** -- Uses `NiceHash.change_one_by_one` to systematically test each data field being wrong one at a time, asserting the server rejects each one.
+
+7. **"returns error if required parameter on data empty/missing"** -- For endpoints with `data_required`, tests both empty and missing values for each required data field.
+
+## Parameters
+
+### mode
+
+Accepts three options: `:overwrite`, `:dont_overwrite` and `:append`. Default: `:append`.
+
+- **append**: If the test file already exists, only missing tests will be added. Existing content is preserved, including `helper/setup.rb` and `helper/cleanup.rb`. If the file doesn't exist, it will be created with all tests.
+
+- **dont_overwrite**: If the test file exists, no changes will be made. If it doesn't exist, it will be created.
+
+- **overwrite**: The test file will be recreated from scratch. All previous content will be deleted.
+
+```ruby
+CreateTests.from "./requests/uber.yaml.rb", mode: :overwrite
+```
+
+### dry_run
+
+Preview which files would be created or modified without writing anything to disk.
+
+```ruby
+CreateTests.from "./requests/uber.yaml.rb", dry_run: true
+```
+
+### return_data
+
+Return the generated code as a Hash (`{ filepath => content }`) without writing files. Useful for programmatic use.
+
+```ruby
+result = CreateTests.from "./requests/uber.yaml.rb", return_data: true
+result.each { |path, content| puts "#{path}: #{content.length} bytes" }
+```
+
+### spec_dir / settings_dir
+
+Custom output directories (default: `./spec` and `./settings`).
+
+```ruby
+CreateTests.from "./requests/uber.yaml.rb", spec_dir: "./test/spec", settings_dir: "./test/config"
+```
+
+### cleanup
+
+Controls whether and how prerequisite setup/cleanup hooks are generated. Default: `:after_all`.
+
+When API endpoints have hierarchical paths (e.g. `/accounts/{account}/pools/{pool}/volumes/{volume}`), `create_tests` infers the dependency chain and generates production-ready test scaffolding with setup expectations, unique naming, and conditional cleanup.
+
+```ruby
+CreateTests.from "./requests/netapp.json.rb"                        # cleanup in after(:all) (default)
+CreateTests.from "./requests/netapp.json.rb", cleanup: :after_each  # move after(:all) cleanup into after(:each)
+CreateTests.from "./requests/netapp.json.rb", cleanup: false        # no cleanup generation
+```
+
+**For PUT/POST (create) endpoints** -- parents are set up, test creates the target:
+
+```ruby
+before(:all) do
+  @http = NiceHttp.new()
+  @volume_name = @volume_name + "-cre"
+  expect(Helper.setup_capacity_pools(@http, ...).state).to eq "Succeeded"
+  @request = Volumes.create_or_update(...)
+end
+after(:all) do
+  unless defined?(DONT_DELETE) && DONT_DELETE
+    Helper.cleanup_capacity_pools(@http, ...)
+  end
+end
+```
+
+**For DELETE endpoints** -- target is recreated before each test (since each test deletes it):
+
+```ruby
+before(:all) do
+  @snapshot_name = @snapshot_name + "-del"
+  expect(Helper.setup_volumes(@http, ...).state).to eq "Succeeded"
+  @request = Snapshots.delete(...)
+end
+before(:each) do |example|
+  @http = NiceHttp.new()
+  expect(Helper.setup_snapshots(@http, ...).state).to eq "Succeeded"
+end
+after(:each) do
+  Helper.cleanup_snapshots(@http, ...)
+end
+after(:all) do
+  unless defined?(DONT_DELETE) && DONT_DELETE
+    Helper.cleanup_volumes(@http, ...)
+  end
+end
+```
+
+**For GET/PATCH endpoints** -- target is set up once in `before(:all)`.
+
+Each setup method cascades to create its parents first (in `helper/setup.rb`):
+
+```ruby
+def self.setup_snapshots(http, ...)
+  setup_capacity_pools(http, ...)
+  # TODO: Create the snapshots resource
+  OpenStruct.new(state: "Succeeded")
+end
+```
+
+Cleanup cascades in reverse (in `helper/cleanup.rb`):
+
+```ruby
+def self.cleanup_snapshots(http, ...)
+  # TODO: Delete the snapshots resource
+  cleanup_capacity_pools(http, ...)
+end
+```
+
+Set `DONT_DELETE=true` in your environment to keep resources for debugging.
 
 ## Example
 
-On this example we will be creating tests for the Uber API using the Swagger / Open API file.
+Creating tests for the Uber API using a Swagger / OpenAPI file:
 
-1. Create a folder in your computer called for example `create_tests_example`
+1. Create a project folder:
 
-2. Copy the file that we have on `./example/requests/uber.yaml` into a folder called `requests` inside `create_tests_example folder`.
+```bash
+mkdir create_tests_example && cd create_tests_example
+```
 
-3. First we will convert this Swagger file into Requests Hashes by running from `create_tests_example` folder:
+2. Copy the Swagger file into a `requests` folder (see `./example/requests/uber.yaml` in this repo).
+
+3. Convert the Swagger file into Request Hashes using [open_api_import](https://github.com/MarioRuiz/open_api_import):
+
 ```bash
 open_api_import ./requests/uber.yaml -fT
 ```
-Now all the Request files were created on the `requests` folder:
+
+Output:
+
 ```
 ** Generated files that contain the code of the requests after importing the Swagger file: 
   - requests/uber.yaml_Products.rb
@@ -78,15 +227,16 @@ Now all the Request files were created on the `requests` folder:
    - requests/uber.yaml.rb 
 ```
 
-4. Now we will create the tests by running:
+4. Generate the tests:
+
 ```bash
 create_tests ./requests/uber.yaml.rb
 ```
 
-5. All your tests will be on `spec` folder, and a `general.rb` file inside `settings` folder was created and also take a look at your `helper.rb` file on `spec` folder.
+Output:
+
 ```
 - Logs: ./requests/uber.yaml.rb_create_tests.log
-** Pay attention, if any of the test files exist or the help file exist only will be added the tests, methods that are missing.
 - Settings: ./settings/general.rb
 - Test created: ./spec/User/profile_user_spec.rb
 - Test created: ./spec/User/activity_user_spec.rb
@@ -96,35 +246,17 @@ create_tests ./requests/uber.yaml.rb
 - Helper: ./spec/helper.rb
 ```
 
-You can see a reproduction of what we did before on here: https://github.com/MarioRuiz/create_tests/tree/master/example
+5. Review `settings/general.rb` to configure your host and authentication, fill in the Helper methods in `spec/helper.rb`, then run:
 
-## Parameters
-
-The parameters can be supplied alone or with other parameters. In case a parameter is not supplied then it will be used the default value.
-
-### mode
-
-Accepts three different options: :overwrite, :dont_overwrite and :append. By default :append. 
-
-  append: In case the test file already exists will be only adding those tests that are missing from that file. If the test file doesn't exist, will be created and added all tests.
-
-  dont_overwrite: In case the test file exists any change will be done. If it doesn't exist then it will be created.
-
-  overwrite: In case the file exist you will loose the current code and a new code will be created. Take in consideration that all previous content will be deleted.
-  If it doesn't exist the test file then it will be created.
-
-```ruby
-  require 'create_tests'
-
-  CreateTests.from "./requests/uber.yaml.rb", mode: :overwrite
-
+```bash
+rspec spec/ --format documentation
 ```
 
+See the full example: https://github.com/MarioRuiz/create_tests/tree/master/example
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/marioruiz/create_tests.
-
+Bug reports and pull requests are welcome on GitHub at https://github.com/MarioRuiz/create_tests.
 
 ## License
 

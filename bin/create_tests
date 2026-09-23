@@ -17,12 +17,29 @@ optparse = OptionParser.new do |opts|
     options[:mode] = :dont_overwrite
   end
 
-  opts.on("-w", "--overwrite", "In case the test file exists it will be ovewritten, so the previous content will deleted") do
+  opts.on("-w", "--overwrite", "In case the test file exists it will be overwritten, so the previous content will be deleted") do
     options[:mode] = :overwrite
   end
 
-  opts.on("-a", "--append", "In case the test file exists it will be ovewritten, so the previous content will deleted") do
+  opts.on("-a", "--append", "In case the test file exists only missing tests will be appended, existing content is preserved") do
     options[:mode] = :append
+  end
+
+  opts.on("-d", "--dry_run", "Preview which files would be created or modified without writing anything") do
+    options[:dry_run] = true
+  end
+
+  opts.on("--cleanup_each", "Generate cleanup in after(:each) instead of after(:all)") do
+    options[:cleanup] = :after_each
+  end
+
+  opts.on("--no_cleanup", "Do not generate setup/cleanup hooks") do
+    options[:cleanup] = false
+  end
+
+  opts.on("-v", "--version", "Show version") do
+    puts "create_tests #{CreateTests::VERSION}"
+    exit
   end
 
 end

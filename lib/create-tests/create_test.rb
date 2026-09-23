@@ -4,7 +4,12 @@ class CreateTests
   class << self
 
     # Return true or false and the test source code
-    private def create_test(module_txt, method_txt, method_obj, test_txt)
+    private def create_test(module_txt, method_txt, method_obj, test_txt, settings_relative_path: '../../settings/general', cleanup: :after_all)
+      unless cleanup == false || [:after_all, :after_each].include?(cleanup)
+        message = "** Wrong cleanup parameter: #{cleanup}"
+        raise message
+      end
+
       modified = false      
       mod_name = module_txt.scan(/::(\w+)$/).join
       req_txt = "#{method_txt}("
@@ -19,7 +24,8 @@ class CreateTests
       end
       req_txt += params.join(", ")
       req_txt += ")"
-      request = eval("require 'nice_hash';#{module_txt}.#{req_txt}")
+      require 'nice_hash'
+      request = method_obj.call(*Array.new(params.size))
 
       req_txt = "#{mod_name}.#{req_txt}"
       params_declaration_txt = ""
@@ -29,20 +35,75 @@ class CreateTests
         @params << p
       end
 
+      all_params_for_chain = params + keywords_required.map { |k| "@#{k}" }
+      resource_chain, target_resource = extract_resource_chain(request, all_params_for_chain)
+      @setup_cleanup_resources ||= []
+      @setup_cleanup_resources.concat(resource_chain) unless resource_chain.empty?
+      @setup_cleanup_resources << target_resource if target_resource
+
+      is_delete = request[:method] == :delete
+      needs_target_setup = target_resource && [:delete, :get, :patch].include?(request[:method])
+      parent_resource = resource_chain.last
+
+      method_suffix = method_txt.to_s.split("_").map { |w| w[0..2] }.join[0..2]
+      method_suffix = "-#{method_suffix}"
+
+      setup_before_all_txt = ""
+      setup_before_each_txt = ""
+      after_each_txt = ""
+      after_all_txt = ""
+
+      if is_delete && target_resource && parent_resource
+        setup_before_all_txt = "expect(Helper.setup_#{parent_resource[:resource]}(@http, #{parent_resource[:params_up_to].join(', ')}).state).to eq 'Succeeded'\n"
+        setup_before_each_txt = "expect(Helper.setup_#{target_resource[:resource]}(@http, #{target_resource[:params_up_to].join(', ')}).state).to eq 'Succeeded'\n"
+        if cleanup
+          after_each_txt = "after(:each) do\nHelper.cleanup_#{target_resource[:resource]}(@http, #{target_resource[:params_up_to].join(', ')})\nend\n"
+          after_all_txt = "after(:all) do\nunless defined?(DONT_DELETE) && DONT_DELETE\nHelper.cleanup_#{parent_resource[:resource]}(@http, #{parent_resource[:params_up_to].join(', ')})\nend\nend\n"
+        end
+      elsif needs_target_setup && target_resource
+        setup_before_all_txt = "expect(Helper.setup_#{target_resource[:resource]}(@http, #{target_resource[:params_up_to].join(', ')}).state).to eq 'Succeeded'\n"
+        if cleanup
+          after_all_txt = "after(:all) do\nunless defined?(DONT_DELETE) && DONT_DELETE\nHelper.cleanup_#{target_resource[:resource]}(@http, #{target_resource[:params_up_to].join(', ')})\nend\nend\n"
+        end
+      elsif parent_resource
+        setup_before_all_txt = "expect(Helper.setup_#{parent_resource[:resource]}(@http, #{parent_resource[:params_up_to].join(', ')}).state).to eq 'Succeeded'\n"
+        if cleanup && target_resource
+          after_each_txt = "after(:each) do\nHelper.cleanup_#{target_resource[:resource]}(@http, #{target_resource[:params_up_to].join(', ')})\nend\n"
+          after_all_txt = "after(:all) do\nunless defined?(DONT_DELETE) && DONT_DELETE\nHelper.cleanup_#{parent_resource[:resource]}(@http, #{parent_resource[:params_up_to].join(', ')})\nend\nend\n"
+        elsif cleanup
+          after_all_txt = "after(:all) do\nunless defined?(DONT_DELETE) && DONT_DELETE\nHelper.cleanup_#{parent_resource[:resource]}(@http, #{parent_resource[:params_up_to].join(', ')})\nend\nend\n"
+        end
+      end
+
+      if cleanup == :after_each && !after_all_txt.empty?
+        after_each_txt += after_all_txt.sub("after(:all)", "after(:each)")
+        after_all_txt = ""
+      end
+
       if test_txt ==""
         modified = true
+
+        suffix_txt = ""
+        if target_resource
+          target_param = target_resource[:params_up_to].last
+          suffix_txt = "#{target_param} = #{target_param} + \"#{method_suffix}\"\n"
+        end
+
+        before_each_block = "before(:each) do |example|\n"
+        before_each_block << "@http = NiceHttp.new()\n" if is_delete && target_resource
+        before_each_block << setup_before_each_txt
+        before_each_block << "@http.logger.info(\"\\n\\n\#{'='*100}\\nTest: \#{example.description}\\n\#{'-'*100}\")\nend\n"
+
         output = "
-        require_relative '../../settings/general'
+        require_relative '#{settings_relative_path}'
         if defined?(#{mod_name}) and defined?(#{mod_name}.#{method_txt})
           RSpec.describe #{mod_name}, '##{method_txt}' do
           before(:all) do
             @http = NiceHttp.new()
-            #{params_declaration_txt}@request = #{req_txt}
+            #{params_declaration_txt}#{suffix_txt}#{setup_before_all_txt}@request = #{req_txt}
             @http.logger.info(\"\\n\#{'+'*50} Before All ends \#{'+'*50}\")
           end
-          before(:each) do |example|
-              @http.logger.info(\"\\n\\n\#{'='*100}\\nTest: \#{example.description}\\n\#{'-'*100}\")
-          end\n"
+          #{after_all_txt}#{after_each_txt}#{before_each_block}\n"
       else
         output = test_txt
         if output.match?(/\s*end\s*end\s*end\s*\Z/)
@@ -64,11 +125,8 @@ class CreateTests
                 expect(resp.code).to eq #{code}\n"
 
         if request[:responses][code].is_a?(Hash) and request[:responses][code].key?(:data)
-          if request.key?(:data_pattern)
-            tests[title] +="expect(NiceHash.compare_structure(@request.responses._#{code}.data, resp.data.json, true, @request.data_pattern)).to be true\n"
-          else
-            tests[title] +="expect(NiceHash.compare_structure(@request.responses._#{code}.data, resp.data.json, true)).to be true\n"
-          end
+          tests[title] +="result = NiceHttp.validate_response(resp, @request.responses._#{code}.data, include_diff: true)\n"
+          tests[title] +="expect(result[:ok]).to be(true), \"Structure mismatch: \#{result[:diff]}\"\n"
         end
         tests[title] += "end\n"
       end
@@ -111,6 +169,45 @@ class CreateTests
         end
         empty_param += "end\n"
         tests["it 'returns error if required parameter empty' "] = "do\n#{empty_param}"
+      end
+
+      if request.key?(:mock_response)
+        title = "it 'returns expected mock response' "
+        tests[title] = "do
+                @http_mock = NiceHttp.new()
+                @http_mock.use_mocks = true
+                resp = @http_mock.#{request[:method]}(@request)
+                expect(resp.code).to eq @request[:mock_response][:code]
+                expect(resp.message).to eq @request[:mock_response][:message]\n"
+        if request[:mock_response].key?(:data)
+          tests[title] += "expect(NiceHash.compare_structure(@request[:mock_response][:data], resp.data.json, true)).to be true\n"
+        end
+        tests[title] += "end\n"
+      end
+
+      if request.key?(:data) and [:post, :put, :patch].include?(request[:method])
+        title = "it 'handles multiple valid data variations' "
+        tests[title] = "do
+                @request[:data].generate_n(5, :correct).each do |generated_data|
+                  request = @request.deep_copy
+                  request[:data] = generated_data
+                  resp = @http.#{request[:method]}(request)
+                  expect(resp.code.to_i).to be_between(200, 299)
+                end
+              end\n"
+      end
+
+      if request.key?(:data)
+        title = "it 'returns error when individual data fields are invalid' "
+        tests[title] = "do
+                wrong = @request[:data].generate(:correct, errors: :min_length)
+                NiceHash.change_one_by_one([@request[:data], :correct], wrong).each do |one_wrong|
+                  request = @request.deep_copy
+                  request[:data] = one_wrong
+                  resp = @http.#{request[:method]}(request)
+                  expect(resp.code.to_i).not_to be_between(200, 299)
+                end
+              end\n"
       end
 
       if request.key?(:data) and request.key?(:data_required)
