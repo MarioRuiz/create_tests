@@ -20,10 +20,11 @@ module Swagger
         #    end_longitude: (number) (required) Longitude component of end location.
         def self.price_estimates(start_latitude, start_longitude, end_latitude, end_longitude)
           {
+            name: "Estimates.price_estimates",
             path: "/v1/estimates/price?start_latitude=#{start_latitude}&start_longitude=#{start_longitude}&end_latitude=#{end_latitude}&end_longitude=#{end_longitude}&",
             method: :get,
             responses: {
-              '200': {
+              "200": {
                 message: "An array of price estimates by product",
                 data: [
                   {
@@ -37,7 +38,7 @@ module Swagger
                   },
                 ],
               },
-              'default': {
+              "default": {
                 message: "Unexpected error",
                 data: {
                   code: 0,
@@ -56,14 +57,15 @@ module Swagger
         # parameters description:
         #    start_latitude: (number) (required) Latitude component of start location.
         #    start_longitude: (number) (required) Longitude component of start location.
-        #    customer_uuid: (string)  Unique customer identifier to be used for experience customization.
-        #    product_id: (string)  Unique identifier representing a specific product for a given latitude & longitude.
+        #    customer_uuid: (string) Unique customer identifier to be used for experience customization.
+        #    product_id: (string) Unique identifier representing a specific product for a given latitude & longitude.
         def self.time_estimates(start_latitude, start_longitude, customer_uuid: "", product_id: "")
           {
+            name: "Estimates.time_estimates",
             path: "/v1/estimates/time?start_latitude=#{start_latitude}&start_longitude=#{start_longitude}&customer_uuid=#{customer_uuid}&product_id=#{product_id}&",
             method: :get,
             responses: {
-              '200': {
+              "200": {
                 message: "An array of products",
                 data: [
                   {
@@ -75,7 +77,7 @@ module Swagger
                   },
                 ],
               },
-              'default': {
+              "default": {
                 message: "Unexpected error",
                 data: {
                   code: 0,

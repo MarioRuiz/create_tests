@@ -15,10 +15,11 @@ module Swagger
         #     The User Profile endpoint returns information about the Uber user that has authorized with the application.
         def self.profile_user()
           {
+            name: "User.profile_user",
             path: "/v1/me",
             method: :get,
             responses: {
-              '200': {
+              "200": {
                 message: "Profile information for a user",
                 data: {
                   first_name: "string",
@@ -28,7 +29,7 @@ module Swagger
                   promo_code: "string",
                 },
               },
-              'default': {
+              "default": {
                 message: "Unexpected error",
                 data: {
                   code: 0,
@@ -45,14 +46,15 @@ module Swagger
         # description:
         #     The User Activity endpoint returns data about a user's lifetime activity with Uber. The response will include pickup locations and times, dropoff locations and times, the distance of past requests, and information about which products were requested.<br><br>The history array in the response will have a maximum length based on the limit parameter. The response value count may exceed limit, therefore subsequent API requests may be necessary.
         # parameters description:
-        #    offset: (integer)  Offset the list of returned results by this amount. Default is zero.
-        #    limit: (integer)  Number of items to retrieve. Default is 5, maximum is 100.
+        #    offset: (integer) Offset the list of returned results by this amount. Default is zero.
+        #    limit: (integer) Number of items to retrieve. Default is 5, maximum is 100.
         def self.activity_user(offset: "", limit: "")
           {
+            name: "User.activity_user",
             path: "/v1/history?offset=#{offset}&limit=#{limit}&",
             method: :get,
             responses: {
-              '200': {
+              "200": {
                 message: "History information for the given user",
                 data: {
                   offset: 0,
@@ -65,7 +67,7 @@ module Swagger
                   ],
                 },
               },
-              'default': {
+              "default": {
                 message: "Unexpected error",
                 data: {
                   code: 0,

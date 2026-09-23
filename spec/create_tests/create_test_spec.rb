@@ -138,6 +138,53 @@ RSpec.describe CreateTests, '#create_test' do
           }
         end
 
+        def self.responses_default_before_201
+          {
+            path: "/v1/widgets",
+            method: :post,
+            data: { name: "string" },
+            responses: {
+              'default': { message: "Unexpected error" },
+              '201': { message: "Created", data: { id: 0 } },
+            },
+          }
+        end
+
+        def self.responses_default_only_string_key
+          {
+            path: "/v1/widgets",
+            method: :get,
+            responses: {
+              "default" => { message: "OK" },
+            },
+          }
+        end
+
+        def self.post_with_read_only
+          {
+            path: "/v1/products",
+            method: :post,
+            data: { id: 0, name: "string" },
+            data_read_only: [:id],
+            responses: {
+              '201': { message: "Created" },
+              '400': { message: "Bad Request" },
+            },
+          }
+        end
+
+        def self.post_with_data_default
+          {
+            path: "/v1/widgets",
+            method: :post,
+            data: { name: "widget" },
+            data_default: { status: "active", name: "nope" },
+            responses: {
+              '201': { message: "Created" },
+            },
+          }
+        end
+
         def self.mock_without_data
           {
             path: "/v1/ping",
@@ -435,6 +482,50 @@ RSpec.describe CreateTests, '#create_test' do
     expect(output).to include("request[:data] = request[:data_examples].first")
     expect(output).not_to include("handles multiple valid data variations")
     expect(output).not_to include("returns error when individual data fields are invalid")
+  end
+
+  it 'picks the first 2xx success code even when default appears first' do
+    _modified, output = generate(:responses_default_before_201)
+    expect(output).to include("expect(resp.code).to eq 201")
+    expect(output).not_to include("expect(resp.code).to eq :default")
+    expect(output).not_to include('expect(resp.code).to eq "default"')
+  end
+
+  it 'uses default response key when it is the only entry, with valid Ruby' do
+    _modified, output = generate(:responses_default_only_string_key)
+    expect(output).to include('expect(resp.code).to eq "default"')
+    expect(output).not_to match(/expect\(resp\.code\)\.to eq default[^"']/)
+  end
+
+  it 'still expects 200 when fixtures start with a 200 response' do
+    _modified, output = generate(:no_params_endpoint)
+    expect(output).to include("expect(resp.code).to eq 200")
+  end
+
+  it 'excludes data_read_only fields from change_one_by_one payload' do
+    _modified, output = generate(:post_with_read_only)
+    expect(output).to include("returns error when individual data fields are invalid")
+    expect(output).to include("payload = @request[:data].deep_copy")
+    expect(output).to include("NiceHash.change_one_by_one([payload, :correct]")
+    expect(output).to include("payload.delete")
+    expect(output).to match(/\[:id\]/)
+    # change_one_by_one must not receive a hash literal that still contains id
+    expect(output).not_to match(/change_one_by_one\(\[\{[^\]]*\bid:/)
+  end
+
+  it 'applies data_default for missing keys without overwriting present values' do
+    _modified, output = generate(:post_with_data_default)
+    expect(output).to include("@request[:data_default].each")
+    expect(output).to include("@request[:data][k] = v if !@request[:data].key?(k) || @request[:data][k].nil?")
+    expect(output).to include("has correct structure in successful response")
+
+    req = TestApi::Products.post_with_data_default
+    req[:data] ||= {}
+    req[:data_default].each do |k, v|
+      req[:data][k] = v if !req[:data].key?(k) || req[:data][k].nil?
+    end
+    expect(req[:data][:name]).to eq("widget")
+    expect(req[:data][:status]).to eq("active")
   end
 
   describe 'append mode with existing test content' do

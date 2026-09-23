@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-09-23
+
+### Changed
+- **Success response code**: The successful-response example expects the first response key whose integer value is 200–299; if none, a key named `default` (string or symbol); otherwise the first key (previous fallback). The same code is used for structure checks and Minitest assertions. 4xx checks are unchanged.
+- **Skip read-only fields in invalid-field tests**: When `:data_read_only` is present, those fields are deep-copied out of the payload passed to `NiceHash.change_one_by_one`. If every field is filtered out, the invalid-field example is not emitted.
+- **Apply `:data_default` for missing body fields**: Missing or nil keys in `:data` are filled from `:data_default` for success and required-data seeds. Present values (including `false` and `0`) are kept. If `:data` is absent, defaults become the body unless `:data_examples` already supplies one. `:data_pattern` is not overwritten by defaults.
+
 ## [1.2.0] - 2026-09-23
 
 ### Added

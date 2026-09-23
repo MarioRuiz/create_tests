@@ -18,10 +18,11 @@ module Swagger
         #    longitude: (number) (required) Longitude component of location.
         def self.list_products(latitude, longitude)
           {
+            name: "Products.list_products",
             path: "/v1/products?latitude=#{latitude}&longitude=#{longitude}&",
             method: :get,
             responses: {
-              '200': {
+              "200": {
                 message: "An array of products",
                 data: [
                   {
@@ -33,7 +34,7 @@ module Swagger
                   },
                 ],
               },
-              'default': {
+              "default": {
                 message: "Unexpected error",
                 data: {
                   code: 0,

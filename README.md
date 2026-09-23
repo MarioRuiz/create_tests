@@ -75,7 +75,7 @@ CreateTests.from "./requests/uber.yaml.rb"
 
 For each API endpoint, `create_tests` generates up to 7 test types:
 
-1. **"has correct structure in successful response"** -- Calls the endpoint and validates the response structure using `NiceHttp.validate_response` with diff details on failure.
+1. **"has correct structure in successful response"** -- Calls the endpoint and validates the response structure using `NiceHttp.validate_response` with diff details on failure. The expected status is the first 2xx response key, else `default`, else the first key. When `:data_default` is present, missing (or nil) keys in `:data` are filled before the call; existing example values are not overwritten.
 
 2. **"doesn't retrieve data if not authenticated"** -- Calls with empty headers and asserts a 4xx response.
 
@@ -85,9 +85,9 @@ For each API endpoint, `create_tests` generates up to 7 test types:
 
 5. **"handles multiple valid data variations"** -- For POST/PUT/PATCH endpoints with a payload source, uses `generate_n(5, :correct)` from nice_hash to test 5 different valid payload variations. Prefers `:data_pattern` when present (real string_pattern / enum / range values from open_api_import); otherwise uses `:data`. Generated values are assigned to `request[:data]` before the call.
 
-6. **"returns error when individual data fields are invalid"** -- Uses `NiceHash.change_one_by_one` on `:data_pattern` (preferred) or `:data` to systematically test each field being wrong one at a time, asserting the server rejects each one.
+6. **"returns error when individual data fields are invalid"** -- Uses `NiceHash.change_one_by_one` on `:data_pattern` (preferred) or `:data` to systematically test each field being wrong one at a time, asserting the server rejects each one. Fields listed in `:data_read_only` are skipped.
 
-7. **"returns error if required parameter on data empty/missing"** -- For endpoints with `data_required`, tests both empty and missing values for each required data field. When `:data` is absent but `:data_examples` is present (common for form uploads), the first example is used as the body for success and required-data tests.
+7. **"returns error if required parameter on data empty/missing"** -- For endpoints with `data_required`, tests both empty and missing values for each required data field. When `:data` is absent but `:data_examples` is present (common for form uploads), the first example is used as the body for success and required-data tests. Otherwise `:data_default` can seed missing body fields the same way as the success example.
 
 Required keyword parameters from open_api_import `create_constants: true` (e.g. `def self.get_item(id: ID)`) get Helper stubs and are called as keywords (`id: @id`), same as positional required args.
 

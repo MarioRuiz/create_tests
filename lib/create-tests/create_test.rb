@@ -149,6 +149,16 @@ class CreateTests
       has_data_examples = request.key?(:data_examples) &&
                           request[:data_examples].is_a?(Array) &&
                           !request[:data_examples].empty?
+      has_data_default = request.key?(:data_default) &&
+                         request[:data_default].is_a?(Hash) &&
+                         !request[:data_default].empty?
+      # Prefer data_examples over defaults when :data is absent
+      apply_data_default = has_data_default && (request.key?(:data) || !has_data_examples)
+      apply_defaults_txt = if apply_data_default
+                             "@request[:data] ||= {}\n                @request[:data_default].each do |k, v|\n                  @request[:data][k] = v if !@request[:data].key?(k) || @request[:data][k].nil?\n                end\n                "
+                           else
+                             ""
+                           end
       # Prefer data_pattern for variation/invalid-field tests; fall back to :data
       payload_source = if request.key?(:data_pattern)
                          ":data_pattern"
@@ -156,16 +166,17 @@ class CreateTests
                          ":data"
                        end
 
-      # first response on responses is the one expected to be returned when success
+      # Success code: first 2xx key, else "default", else first key
       if include_kind?(only_kinds, :success) && request.key?(:responses) and request[:responses].size > 0
-        code = request[:responses].keys[0]
+        code = success_response_code(request[:responses])
+        code_src = format_response_code(code)
         title = example_title("has correct structure in successful response", test, trailing_space: true)
         if !request.key?(:data) && has_data_examples
           tests[title] = "do
                 request = @request.deep_copy
                 request[:data] = @request[:data_examples].first
                 resp = @http.#{request[:method]}(request)
-                #{assert_eq('resp.code', code, test)}\n"
+                #{assert_eq('resp.code', code_src, test)}\n"
           if request[:responses][code].is_a?(Hash) and request[:responses][code].key?(:data)
             tests[title] +="result = NiceHttp.validate_response(resp, @request.responses._#{code}.data, include_diff: true)\n"
             tests[title] += "#{assert_be_true('result[:ok]', 'Structure mismatch: #{result[:diff]}', test)}\n"
@@ -173,8 +184,8 @@ class CreateTests
           tests[title] += "end\n"
         else
           tests[title] = "do
-                resp = @http.#{request[:method]}(@request)
-                #{assert_eq('resp.code', code, test)}\n"
+                #{apply_defaults_txt}resp = @http.#{request[:method]}(@request)
+                #{assert_eq('resp.code', code_src, test)}\n"
 
           if request[:responses][code].is_a?(Hash) and request[:responses][code].key?(:data)
             tests[title] +="result = NiceHttp.validate_response(resp, @request.responses._#{code}.data, include_diff: true)\n"
@@ -253,8 +264,20 @@ class CreateTests
       end
 
       if include_kind?(only_kinds, :invalid_fields) && payload_source
-        title = example_title("returns error when individual data fields are invalid", test, trailing_space: true)
-        tests[title] = "do
+        payload_key = payload_source == ":data_pattern" ? :data_pattern : :data
+        read_only_names = Array(request[:data_read_only]).map(&:to_s)
+        payload_for_invalid = request[payload_key]
+        if payload_for_invalid.is_a?(Hash) && !read_only_names.empty?
+          payload_for_invalid = payload_for_invalid.deep_copy
+          read_only_names.each do |name|
+            payload_for_invalid.delete(name.to_sym)
+            payload_for_invalid.delete(name)
+          end
+        end
+        unless payload_for_invalid.nil? || (payload_for_invalid.respond_to?(:empty?) && payload_for_invalid.empty?)
+          title = example_title("returns error when individual data fields are invalid", test, trailing_space: true)
+          if read_only_names.empty?
+            tests[title] = "do
                 wrong = @request[#{payload_source}].generate(:correct, errors: :min_length)
                 NiceHash.change_one_by_one([@request[#{payload_source}], :correct], wrong).each do |one_wrong|
                   request = @request.deep_copy
@@ -263,11 +286,32 @@ class CreateTests
                   #{assert_between('resp.code.to_i', '200', '299', test, negate: true)}
                 end
               end\n"
+          else
+            read_only_lit = request[:data_read_only].map(&:inspect).join(", ")
+            tests[title] = "do
+                payload = @request[#{payload_source}].deep_copy
+                [#{read_only_lit}].each do |f|
+                  payload.delete(f)
+                  payload.delete(f.to_s)
+                  payload.delete(f.to_s.to_sym)
+                end
+                wrong = payload.generate(:correct, errors: :min_length)
+                NiceHash.change_one_by_one([payload, :correct], wrong).each do |one_wrong|
+                  request = @request.deep_copy
+                  request[:data] = one_wrong
+                  resp = @http.#{request[:method]}(request)
+                  #{assert_between('resp.code.to_i', '200', '299', test, negate: true)}
+                end
+              end\n"
+          end
+        end
       end
 
-      if include_kind?(only_kinds, :required_data) && request.key?(:data_required) && (request.key?(:data) || has_data_examples)
+      if include_kind?(only_kinds, :required_data) && request.key?(:data_required) && (request.key?(:data) || has_data_examples || apply_data_default)
         seed_data_line = if !request.key?(:data) && has_data_examples
                            "request[:data] = request[:data_examples].first\n                  "
+                         elsif apply_data_default
+                           "request[:data] ||= {}\n                  request[:data_default].each do |k, v|\n                    request[:data][k] = v if !request[:data].key?(k) || request[:data][k].nil?\n                  end\n                  "
                          else
                            ""
                          end
@@ -332,6 +376,30 @@ class CreateTests
         output +="\nend"
       end
       return modified, output
+    end
+
+    private def success_response_code(responses)
+      keys = responses.keys
+      twoxx = keys.find do |k|
+        n = k.to_s
+        n.match?(/\A\d+\z/) && (200..299).include?(n.to_i)
+      end
+      return twoxx if twoxx
+
+      default_key = keys.find { |k| k.to_s == "default" }
+      return default_key if default_key
+
+      keys[0]
+    end
+
+    # Numeric status codes stay unquoted (eq 200); non-numeric keys use inspect.
+    private def format_response_code(code)
+      s = code.to_s
+      if s.match?(/\A\d+\z/)
+        s
+      else
+        code.inspect
+      end
     end
 
     private def normalize_only(only)
