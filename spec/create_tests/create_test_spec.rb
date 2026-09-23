@@ -100,6 +100,44 @@ RSpec.describe CreateTests, '#create_test' do
           }
         end
 
+        def self.post_with_data_and_pattern
+          {
+            path: "/v1/products",
+            method: :post,
+            data: { name: "string", price: 0 },
+            data_pattern: { name: :"5-20:L", price: 1..100 },
+            responses: {
+              '201': { message: "Created", data: { id: 0, name: "string" } },
+              '400': { message: "Bad Request" },
+            },
+          }
+        end
+
+        def self.post_with_pattern_only
+          {
+            path: "/v1/products",
+            method: :post,
+            data_pattern: { name: :"5-20:L", price: 1..100 },
+            responses: {
+              '201': { message: "Created" },
+              '400': { message: "Bad Request" },
+            },
+          }
+        end
+
+        def self.post_with_data_examples_only
+          {
+            path: "/v1/upload",
+            method: :post,
+            data_examples: [{ file: "report.csv", note: "quarterly" }],
+            data_required: [:file],
+            responses: {
+              '201': { message: "Uploaded", data: { id: "string" } },
+              '400': { message: "Bad Request" },
+            },
+          }
+        end
+
         def self.mock_without_data
           {
             path: "/v1/ping",
@@ -366,6 +404,39 @@ RSpec.describe CreateTests, '#create_test' do
     expect(output).not_to include("returns error when individual data fields are invalid")
   end
 
+  it 'prefers data_pattern over type-hint data for generate_n and change_one_by_one' do
+    _modified, output = generate(:post_with_data_and_pattern)
+    expect(output).to include("@request[:data_pattern].generate_n(5, :correct)")
+    expect(output).to include("NiceHash.change_one_by_one([@request[:data_pattern], :correct]")
+    expect(output).to include("request[:data] = generated_data")
+    expect(output).to include("request[:data] = one_wrong")
+    expect(output).not_to include("@request[:data].generate_n")
+    expect(output).not_to include("change_one_by_one([@request[:data],")
+  end
+
+  it 'falls back to :data for generate_n when data_pattern is absent' do
+    _modified, output = generate(:post_with_data)
+    expect(output).to include("@request[:data].generate_n(5, :correct)")
+    expect(output).to include("NiceHash.change_one_by_one([@request[:data], :correct]")
+  end
+
+  it 'uses data_pattern alone for generate_n when :data is absent' do
+    _modified, output = generate(:post_with_pattern_only)
+    expect(output).to include("@request[:data_pattern].generate_n(5, :correct)")
+    expect(output).to include("returns error when individual data fields are invalid")
+  end
+
+  it 'uses data_examples.first for success and required-data tests when :data is missing' do
+    _modified, output = generate(:post_with_data_examples_only)
+    expect(output).to include("request = @request.deep_copy")
+    expect(output).to include("request[:data] = @request[:data_examples].first")
+    expect(output).to include("returns error if required parameter on data empty")
+    expect(output).to include("returns error if required parameter on data missing")
+    expect(output).to include("request[:data] = request[:data_examples].first")
+    expect(output).not_to include("handles multiple valid data variations")
+    expect(output).not_to include("returns error when individual data fields are invalid")
+  end
+
   describe 'append mode with existing test content' do
     it 'appends missing tests with timestamp to existing content' do
       partial_output = <<~RUBY
@@ -429,12 +500,56 @@ RSpec.describe CreateTests, '#create_test' do
     before(:all) do
       # Define a constant that the keyword detection code will find
       Object.const_set(:REGION, "us-east") unless Object.const_defined?(:REGION)
+      Object.const_set(:ID, "item-1") unless Object.const_defined?(:ID)
 
       module TestApiKw
         module Services
           def self.get_service(region: "default")
             {
               path: "/v1/services?region=#{region}",
+              method: :get,
+              responses: {
+                '200': { message: "OK" },
+                '400': { message: "Bad Request" },
+              },
+            }
+          end
+
+          def self.get_item(id: ID)
+            {
+              path: "/v1/items/#{id}",
+              method: :get,
+              responses: {
+                '200': { message: "OK", data: { id: "string" } },
+                '400': { message: "Bad Request" },
+              },
+            }
+          end
+
+          def self.list_optional(offset: "")
+            {
+              path: "/v1/items?offset=#{offset}",
+              method: :get,
+              responses: {
+                '200': { message: "OK" },
+              },
+            }
+          end
+
+          def self.mixed(name, id: ID)
+            {
+              path: "/v1/items/#{id}?name=#{name}",
+              method: :get,
+              responses: {
+                '200': { message: "OK" },
+                '400': { message: "Bad Request" },
+              },
+            }
+          end
+
+          def self.keyreq_only(token:)
+            {
+              path: "/v1/secure?token=#{token}",
               method: :get,
               responses: {
                 '200': { message: "OK" },
@@ -462,6 +577,65 @@ RSpec.describe CreateTests, '#create_test' do
       expect(output).to include("returns error if required parameter empty")
       expect(output).to include(":region")
       expect(output).to include("kw =>")
+    end
+
+    it 'creates Helper stub and keyword call for create_constants id: ID' do
+      CreateTests.instance_variable_set(:@params, [])
+      CreateTests.instance_variable_set(:@setup_cleanup_resources, [])
+      CreateTests.instance_variable_set(:@logger, Logger.new(nil))
+      mod = TestApiKw::Services
+      _modified, output = CreateTests.send(
+        :create_test, "TestApiKw::Services", :get_item,
+        mod.method(:get_item), ""
+      )
+      expect(output).to include("@id = Helper.id(@http)")
+      expect(output).to include("Services.get_item(id: @id)")
+      expect(CreateTests.instance_variable_get(:@params)).to include("@id")
+      expect(output).to include("kw =>")
+    end
+
+    it 'does not create Helper stub for optional keyword without UPCASE constant' do
+      CreateTests.instance_variable_set(:@params, [])
+      CreateTests.instance_variable_set(:@setup_cleanup_resources, [])
+      CreateTests.instance_variable_set(:@logger, Logger.new(nil))
+      mod = TestApiKw::Services
+      _modified, output = CreateTests.send(
+        :create_test, "TestApiKw::Services", :list_optional,
+        mod.method(:list_optional), ""
+      )
+      expect(output).not_to include("Helper.offset")
+      expect(output).not_to include("@offset =")
+      expect(CreateTests.instance_variable_get(:@params)).not_to include("@offset")
+      expect(output).to include("Services.list_optional()")
+    end
+
+    it 'supports mixed positional and keyword params' do
+      CreateTests.instance_variable_set(:@params, [])
+      CreateTests.instance_variable_set(:@setup_cleanup_resources, [])
+      CreateTests.instance_variable_set(:@logger, Logger.new(nil))
+      mod = TestApiKw::Services
+      _modified, output = CreateTests.send(
+        :create_test, "TestApiKw::Services", :mixed,
+        mod.method(:mixed), ""
+      )
+      expect(output).to include("@name = Helper.name(@http)")
+      expect(output).to include("@id = Helper.id(@http)")
+      expect(output).to include("Services.mixed(@name, id: @id)")
+    end
+
+    it 'treats :keyreq as required and fetches request hash without positional nils' do
+      CreateTests.instance_variable_set(:@params, [])
+      CreateTests.instance_variable_set(:@setup_cleanup_resources, [])
+      CreateTests.instance_variable_set(:@logger, Logger.new(nil))
+      mod = TestApiKw::Services
+      expect {
+        _modified, output = CreateTests.send(
+          :create_test, "TestApiKw::Services", :keyreq_only,
+          mod.method(:keyreq_only), ""
+        )
+        expect(output).to include("@token = Helper.token(@http)")
+        expect(output).to include("Services.keyreq_only(token: @token)")
+      }.not_to raise_error
     end
   end
 

@@ -79,11 +79,13 @@ For each API endpoint, `create_tests` generates up to 7 test types:
 
 4. **"returns expected mock response"** -- For endpoints with `mock_response` data (from `open_api_import`), validates the mock response matches the expected code, message, and structure.
 
-5. **"handles multiple valid data variations"** -- For POST/PUT/PATCH endpoints with data, uses `generate_n(5, :correct)` from nice_hash to test 5 different valid payload variations.
+5. **"handles multiple valid data variations"** -- For POST/PUT/PATCH endpoints with a payload source, uses `generate_n(5, :correct)` from nice_hash to test 5 different valid payload variations. Prefers `:data_pattern` when present (real string_pattern / enum / range values from open_api_import); otherwise uses `:data`. Generated values are assigned to `request[:data]` before the call.
 
-6. **"returns error when individual data fields are invalid"** -- Uses `NiceHash.change_one_by_one` to systematically test each data field being wrong one at a time, asserting the server rejects each one.
+6. **"returns error when individual data fields are invalid"** -- Uses `NiceHash.change_one_by_one` on `:data_pattern` (preferred) or `:data` to systematically test each field being wrong one at a time, asserting the server rejects each one.
 
-7. **"returns error if required parameter on data empty/missing"** -- For endpoints with `data_required`, tests both empty and missing values for each required data field.
+7. **"returns error if required parameter on data empty/missing"** -- For endpoints with `data_required`, tests both empty and missing values for each required data field. When `:data` is absent but `:data_examples` is present (common for form uploads), the first example is used as the body for success and required-data tests.
+
+Required keyword parameters from open_api_import `create_constants: true` (e.g. `def self.get_item(id: ID)`) get Helper stubs and are called as keywords (`id: @id`), same as positional required args.
 
 ## Parameters
 

@@ -15,17 +15,26 @@ class CreateTests
       req_txt = "#{method_txt}("
       params = []
       keywords_required = []
+      keyreq_kwargs = {}
       method_obj.parameters.each do |p|
-        if p[0] == :req #required
+        if p[0] == :req #required positional
           params << "@#{p[1]}"
+        elsif p[0] == :keyreq
+          keywords_required << p[1]
+          keyreq_kwargs[p[1]] = nil
         elsif p[0] == :key and p[1].to_s.match?(/^[a-z]/i) and Object.const_defined?(p[1].to_s.upcase)
+          # create_constants: required path/query as keyword with UPCASE constant default
           keywords_required << p[1]
         end
       end
-      req_txt += params.join(", ")
+      call_parts = params.dup
+      keywords_required.each { |k| call_parts << "#{k}: @#{k}" }
+      req_txt += call_parts.join(", ")
       req_txt += ")"
       require 'nice_hash'
-      request = method_obj.call(*Array.new(params.size))
+      # Keyword-only methods (create_constants) must not receive nil positionals;
+      # :keyreq needs an explicit keyword so Method#call succeeds.
+      request = method_obj.call(*Array.new(params.size), **keyreq_kwargs)
 
       req_txt = "#{mod_name}.#{req_txt}"
       params_declaration_txt = ""
@@ -33,6 +42,10 @@ class CreateTests
       params.each do |p|
         params_declaration_txt << "#{p} = Helper.#{p.gsub('@','')}(@http)\n"
         @params << p
+      end
+      keywords_required.each do |k|
+        params_declaration_txt << "@#{k} = Helper.#{k}(@http)\n"
+        @params << "@#{k}"
       end
 
       all_params_for_chain = params + keywords_required.map { |k| "@#{k}" }
@@ -116,19 +129,42 @@ class CreateTests
 
       tests = Hash.new()
 
+      has_data_examples = request.key?(:data_examples) &&
+                          request[:data_examples].is_a?(Array) &&
+                          !request[:data_examples].empty?
+      # Prefer data_pattern for variation/invalid-field tests; fall back to :data
+      payload_source = if request.key?(:data_pattern)
+                         ":data_pattern"
+                       elsif request.key?(:data)
+                         ":data"
+                       end
+
       # first response on responses is the one expected to be returned when success
       if request.key?(:responses) and request[:responses].size > 0
         code = request[:responses].keys[0]
         title="it 'has correct structure in successful response' "
-        tests[title] = "do
+        if !request.key?(:data) && has_data_examples
+          tests[title] = "do
+                request = @request.deep_copy
+                request[:data] = @request[:data_examples].first
+                resp = @http.#{request[:method]}(request)
+                expect(resp.code).to eq #{code}\n"
+          if request[:responses][code].is_a?(Hash) and request[:responses][code].key?(:data)
+            tests[title] +="result = NiceHttp.validate_response(resp, @request.responses._#{code}.data, include_diff: true)\n"
+            tests[title] +="expect(result[:ok]).to be(true), \"Structure mismatch: \#{result[:diff]}\"\n"
+          end
+          tests[title] += "end\n"
+        else
+          tests[title] = "do
                 resp = @http.#{request[:method]}(@request)
                 expect(resp.code).to eq #{code}\n"
 
-        if request[:responses][code].is_a?(Hash) and request[:responses][code].key?(:data)
-          tests[title] +="result = NiceHttp.validate_response(resp, @request.responses._#{code}.data, include_diff: true)\n"
-          tests[title] +="expect(result[:ok]).to be(true), \"Structure mismatch: \#{result[:diff]}\"\n"
+          if request[:responses][code].is_a?(Hash) and request[:responses][code].key?(:data)
+            tests[title] +="result = NiceHttp.validate_response(resp, @request.responses._#{code}.data, include_diff: true)\n"
+            tests[title] +="expect(result[:ok]).to be(true), \"Structure mismatch: \#{result[:diff]}\"\n"
+          end
+          tests[title] += "end\n"
         end
-        tests[title] += "end\n"
       end
 
       title = "it 'doesn\\'t retrieve data if not authenticated'"
@@ -185,10 +221,10 @@ class CreateTests
         tests[title] += "end\n"
       end
 
-      if request.key?(:data) and [:post, :put, :patch].include?(request[:method])
+      if payload_source && [:post, :put, :patch].include?(request[:method])
         title = "it 'handles multiple valid data variations' "
         tests[title] = "do
-                @request[:data].generate_n(5, :correct).each do |generated_data|
+                @request[#{payload_source}].generate_n(5, :correct).each do |generated_data|
                   request = @request.deep_copy
                   request[:data] = generated_data
                   resp = @http.#{request[:method]}(request)
@@ -197,11 +233,11 @@ class CreateTests
               end\n"
       end
 
-      if request.key?(:data)
+      if payload_source
         title = "it 'returns error when individual data fields are invalid' "
         tests[title] = "do
-                wrong = @request[:data].generate(:correct, errors: :min_length)
-                NiceHash.change_one_by_one([@request[:data], :correct], wrong).each do |one_wrong|
+                wrong = @request[#{payload_source}].generate(:correct, errors: :min_length)
+                NiceHash.change_one_by_one([@request[#{payload_source}], :correct], wrong).each do |one_wrong|
                   request = @request.deep_copy
                   request[:data] = one_wrong
                   resp = @http.#{request[:method]}(request)
@@ -210,12 +246,17 @@ class CreateTests
               end\n"
       end
 
-      if request.key?(:data) and request.key?(:data_required)
+      if request.key?(:data_required) && (request.key?(:data) || has_data_examples)
+        seed_data_line = if !request.key?(:data) && has_data_examples
+                           "request[:data] = request[:data_examples].first\n                  "
+                         else
+                           ""
+                         end
         empty_param_data = ""
         empty_param_data += "
                 @request[:data_required].each do |p|
                   request = @request.deep_copy
-                  request.values_for[p] = ''
+                  #{seed_data_line}request.values_for[p] = ''
                   resp = @http.#{request[:method]}(request)
                   expect(resp.code).not_to be_between('200', '299')
                     if request.responses.key?(resp.code.to_sym)
@@ -230,7 +271,7 @@ class CreateTests
         missing_param_data += "
                 @request[:data_required].each do |p|
                   request = @request.deep_copy
-                  NiceHash.delete_nested(request[:data], p)
+                  #{seed_data_line}NiceHash.delete_nested(request[:data], p)
                   resp = @http.#{request[:method]}(request)
                   expect(resp.code).not_to be_between('200', '299')
                     if request.responses.key?(resp.code.to_sym)

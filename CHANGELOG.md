@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-09-23
+
+### Added
+- **data_pattern for variation/invalid-field tests**: When a request hash includes `:data_pattern` (from open_api_import 0.12.2+), `generate_n` and `NiceHash.change_one_by_one` tests use that key instead of type-hint `:data`. Expanded payloads are still assigned to `request[:data]` before the HTTP call. Falls back to `:data` when `:data_pattern` is absent.
+- **data_examples as request body**: When `:data` is missing and `:data_examples` is a non-empty array (e.g. form uploads), the successful-response test and required-data empty/missing tests seed `request[:data]` from the first example. Fuzz/invalid-field tests are not invented from plain example literals alone.
+- **create_constants keyword Helper stubs**: Required keyword parameters (`id: ID` with an UPCASE constant default, or `:keyreq`) get Helper methods, `@id = Helper.id(@http)` declarations, and keyword calls such as `Items.get_item(id: @id)`. Optional keywords without an UPCASE constant are left alone. Empty-keyword validation (`kw => ''`) is unchanged.
+
 ## [1.0.0] - 2026-09-23
 
 ### Added
